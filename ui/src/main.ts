@@ -20,6 +20,9 @@ if (!ctx) {
 
 // ctx.putImageData(texture, 0, 0)
 
+const wsUri = "ws://127.0.0.1:3000/websocket"
+const websocket = new WebSocket(wsUri)
+
 let keys: Record<string, boolean> = {}
 
 interface Vec2 {
@@ -27,7 +30,16 @@ interface Vec2 {
     y: number
 }
 
-let cameraTarget: Vec2 = {x:0,y:0}
+interface RoomData {
+    id: string
+    cameraTarget: Vec2
+}
+
+let roomData: RoomData = {
+    id: "",
+    cameraTarget: {x:0,y:0}
+}
+
 let mouseCurrent: Vec2 = {x:0,y:0}
 let mouseTarget: Vec2 = {x:0,y:0}
 let mouseEase = 0.1
@@ -41,7 +53,7 @@ interface Entity {
     width?: number
     height?: number
     radius?: number
-    color?: number
+    color?: string
     draw(): void
 }
 
@@ -51,16 +63,17 @@ const randRange = (min: number = 0, max: number = 1) => {
 }
 
 function drawRectangle(this: Entity) {
-    ctx.fillStyle = `#${this.color?.toString(16)}`
-    ctx.fillRect(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y, this.width as number, this.height as number)
+    ctx.fillStyle = this.color as string
+    ctx.fillRect(this.position.x - roomData.cameraTarget.x, this.position.y-roomData.cameraTarget.y, this.width as number, this.height as number)
 }
 
 function drawCircle(this: Entity) {
     ctx.beginPath()
-    ctx.fillStyle = `#${this.color?.toString(16)}`
-    ctx.moveTo(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y)
-    ctx.arc(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y, this.radius as number, 0, 2*Math.PI, true)
+    ctx.fillStyle = this.color as string
+    // ctx.moveTo(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y)
+    ctx.arc(this.position.x - roomData.cameraTarget.x, this.position.y-roomData.cameraTarget.y, this.radius as number, 0, 2*Math.PI, true)
     ctx.fill()
+    ctx.stroke()
 }
 
 let objects: Entity[] = []
@@ -74,55 +87,65 @@ for(let i = 0; i < 50; i++) {
         width: ((Math.random() + 0.5)/1.5)*100,
         height: ((Math.random() + 0.5)/1.5)*100,
         radius: ((Math.random() + 0.5)/1.5)*100,
-        color: Math.floor(randRange(0.5)*0xFF + randRange(0.5)*0xFF00 + randRange(0.5)*0xFF0000)
+        color: "#" + Math.floor(randRange(0.5)*0xFF + randRange(0.5)*0xFF00 + randRange(0.5)*0xFF0000).toString(16)
     })
 }
 
 if(location.pathname.slice(1).split("/")[0]?.length == 36) {
-    let roomId = location.pathname.slice(1).split("/")[0]
-    // establish websocket connection on existing room data 
-    // and populate objects from there
-
-    const wsUri = "ws://127.0.0.1:3000/websocket"
-    const websocket = new WebSocket(wsUri)
+    roomData.id = location.pathname.slice(1).split("/")[0] as string
 
     websocket.addEventListener("open", (ev) => {
         console.log("Socket Connected");
-        websocket.send(JSON.stringify({roomId}))
     })
 
     websocket.addEventListener("message", (ev: MessageEvent) => {
-        console.log("Message received: " + ev.data)
+        try {
+            let v = JSON.parse(ev.data)
+            if(v.id && v.cameraTarget) {
+                roomData = v
+            }
+        } catch(err) {
+            console.log(err);
+        }
     })
 } else {
-    let roomId = crypto.randomUUID()
-    history.pushState({}, "", roomId)
+    roomData.id = crypto.randomUUID()
+    history.pushState({}, "", roomData.id)
 
-    const wsUri = "ws://127.0.0.1:3000/websocket"
-    const websocket = new WebSocket(wsUri)
+    websocket.send(JSON.stringify({
+        id: roomData.id,
+        cameraTarget: roomData.cameraTarget
+    }))
 
     websocket.addEventListener("open", (ev) => {
         console.log("Socket Connected");
     })
 
     websocket.addEventListener("message", (ev: MessageEvent) => {
-        console.log("Message received: " + ev.data)
+        try {
+            let v = JSON.parse(ev.data)
+            if(v.id && v.cameraTarget) {
+                roomData = v
+            }
+        } catch(err) {
+            console.log(err);
+        }
     })
 }
 
 const update = (time: DOMHighResTimeStamp) => {
     // UPDATE
     if(keys["KeyA"]) {
-        cameraTarget.x -= 10
+        roomData.cameraTarget.x -= 10
     }
     if(keys["KeyD"]) {
-        cameraTarget.x += 10
+        roomData.cameraTarget.x += 10
     }
     if(keys["KeyW"]) {
-        cameraTarget.y -= 10
+        roomData.cameraTarget.y -= 10
     }
     if(keys["KeyS"]) {
-        cameraTarget.y += 10
+        roomData.cameraTarget.y += 10
     }
 
     let mouseDelta = {x: mouseTarget.x - mouseCurrent.x, y: mouseTarget.y - mouseCurrent.y}
@@ -131,8 +154,8 @@ const update = (time: DOMHighResTimeStamp) => {
     mouseCurrent.y += mouseDelta.y
 
     if(mouseDown && keys["ControlLeft"]) {
-        cameraTarget.x -= mouseDelta.x
-        cameraTarget.y -= mouseDelta.y
+        roomData.cameraTarget.x -= mouseDelta.x
+        roomData.cameraTarget.y -= mouseDelta.y
     }
 
     // DRAW
@@ -162,4 +185,12 @@ window.addEventListener("mousemove", (ev) => {
 })
 
 window.addEventListener("mousedown", () => mouseDown = true)
-window.addEventListener("mouseup", () => mouseDown = false)
+window.addEventListener("mouseup", () => {
+    mouseDown = false
+    if(websocket.OPEN) {
+        websocket.send(JSON.stringify({
+            id: roomData.id,
+            cameraTarget: roomData.cameraTarget
+        }))
+    }
+})
