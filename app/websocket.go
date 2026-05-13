@@ -27,22 +27,33 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error upgrading:", err)
 		return
 	}
+	// bug: we're closing connection before goroutines can use it
+	// as the defer is reached since the goroutines won't block
 	defer conn.Close()
+
+	// TODO: look at https://github.com/gorilla/websocket/blob/main/examples/chat/README.md
+	// and replace current conn defer and client model with thiers
+
+	mutex.Lock()
+	clients[conn] = true
+	mutex.Unlock()
 
 	userId := userIdCounter
 	userIdCounter++
 	log.Println("User ", userId)
 
-	go handleConnection(conn, userId)
+	go handleRead(conn, userId)
+	go handleWrite(conn, userId)
 }
 
-func handleConnection(conn *websocket.Conn, userId int) {
+func handleRead(conn *websocket.Conn, userId int) {
 	for {
-		// Read message from the client
 		_, message, err := conn.ReadMessage()
 		if err != nil {
+			mutex.Lock()
+			delete(clients, conn)
+			mutex.Unlock()
 			fmt.Println("Error reading message:", err)
-			break
 		}
 		fmt.Printf("Received: %s\n", message)
 
@@ -60,6 +71,8 @@ func handleConnection(conn *websocket.Conn, userId int) {
 			roomUsers[roomId][userId] = true
 		}
 
+		roomBroadcasts[roomId] <- message
+
 		for k, v := range userOutChannels {
 			if k != userId {
 				_, exists := roomUsers[roomId][k]
@@ -68,24 +81,34 @@ func handleConnection(conn *websocket.Conn, userId int) {
 				}
 			}
 		}
-		// fmt.Printf("Received: %s\n", message)
-		// Echo the message back to the client
-		// if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
-		// 	fmt.Println("Error writing message:", err)
-		// 	break
+	}
+}
+
+func handleWrite(conn *websocket.Conn, userId int) {
+	for {
+		// for msg := range userOutChannels[userId] {
+		// 	if string(msg) == "updated" {
+		// 		data, err := json.Marshal(rooms[userRoom[userId]])
+		// 		if err != nil {
+		// 			log.Println(err)
+		// 		}
+		// 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		// 			fmt.Println("Error writing message:", err)
+		// 			break
+		// 		}
+		// 	}
 		// }
 
-		for msg := range userOutChannels[userId] {
-			if string(msg) == "updated" {
-				data, err := json.Marshal(rooms[userRoom[userId]])
-				if err != nil {
-					log.Println(err)
-				}
-				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-					fmt.Println("Error writing message:", err)
-					break
-				}
+		message := <-roomBroadcasts[userRoom[userId]]
+
+		mutex.Lock()
+		for client := range clients {
+			err := client.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				client.Close()
+				delete(clients, client)
 			}
 		}
+		mutex.Unlock()
 	}
 }
