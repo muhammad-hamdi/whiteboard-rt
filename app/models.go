@@ -59,17 +59,23 @@ type CanvasData struct {
 	BrushStrokes []BrushStroke
 }
 
+type EventType int
+
+const (
+	CreatRect EventType = iota
+)
+
 type Event struct {
-	Timestamp int64  `json:"timestamp"`
-	Type      string `json:"type"`
-	Value     []byte `json:"value"`
+	Timestamp int64     `json:"timestamp"`
+	Type      EventType `json:"type"`
+	Value     []byte    `json:"value"`
 }
 
 type Canvas struct {
-	Id       string     `json:"id"`
-	OwnerId  string     `json:"owner_id"`
-	Snapshot CanvasData `json:"snapshot"`
-	EventLog []string   `json:"event_log"`
+	Id       string      `json:"id"`
+	OwnerId  string      `json:"owner_id"`
+	Snapshot *CanvasData `json:"snapshot"`
+	EventLog []*Event    `json:"event_log"`
 }
 
 // the room models the hub for connected clients
@@ -92,8 +98,17 @@ type Message struct {
 	Data []byte      `json:"data"`
 }
 
+type NewCanvasMessage struct {
+	UserId string `json:"user_id"`
+}
+
+type ConnectToCanvasMessage struct {
+	UserId   string `json:"user_id"`
+	CanvasId string `json:"canvas_id"`
+}
+
 var (
-	users       []User   // users table
-	canvases    []Canvas // canvases table
-	socketRooms []Room
+	users       []*User   // users table
+	canvases    []*Canvas // canvases table
+	socketRooms []*Room
 )

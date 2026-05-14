@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -18,11 +19,11 @@ var upgrader = websocket.Upgrader{
 
 var clients = make(map[*websocket.Conn]bool)      // Connected clients
 var roomBroadcasts = make(map[string]chan []byte) // Broadcast channel
-var mutex = &sync.Mutex{}                         // Protect clients map
+var mu = &sync.Mutex{}                            // Protect clients map
 
 func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	// Upgrade the HTTP connection to a WebSocket connection
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrdr.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Error upgrading:", err)
 		return
@@ -31,28 +32,134 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	// as the defer is reached since the goroutines won't block
 	defer conn.Close()
 
-	// TODO: look at https://github.com/gorilla/websocket/blob/main/examples/chat/README.md
-	// and replace current conn defer and client model with thiers
+	// init/handshake/connection start flow
+	// 1. Check if user sent user_id
+	// 2. if user_id find user reference in users
+	// 3. if not create user object and append in users
+	// 4. Check if user sent canvas_id
+	// 5. if canvas_id find canvas ref in canvases
+	// 6. find room associated with canvas
+	// 7. if room, create client and subscribe to room
+	// 8. if not, create room and client and subscribe client to newly created room
+	// 6. if no canvas_id, create canvas, room, client and do appropriate appends and subscription
 
-	mutex.Lock()
-	clients[conn] = true
-	mutex.Unlock()
+	//// for #1 we'll do a pre-read, first user message is either a NewCanvas or ConnectToCanvas
+	//// ConnectToCanvas will be treated differently if the connection is active?
+	///// Check said canvas and find if an exisitng room is there, otherwise create the room for the canvas
 
-	userId := userIdCounter
-	userIdCounter++
-	log.Println("User ", userId)
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			log.Printf("error: %v", err)
+		}
+	}
 
-	go handleRead(conn, userId)
-	go handleWrite(conn, userId)
+	var initMessage Message
+	json.Unmarshal(message, &initMessage)
+
+	// Of course the lookups will be replaced with db queries later
+	// but we're testing with in-memory data for now
+	var canvas *Canvas
+	var user *User
+	if initMessage.Type == ConnectToCanvas || initMessage.Type == NewCanvas {
+		switch initMessage.Type {
+		case NewCanvas:
+			var newCanvasMsg NewCanvasMessage
+			{
+				canvas = &Canvas{}
+				json.Unmarshal(initMessage.Data, &newCanvasMsg)
+				canvas.Id = uuid.Must(uuid.NewV4()).String()
+
+				if len(newCanvasMsg.UserId) > 0 {
+					mu.Lock()
+					for _, u := range users {
+						if u.Id == newCanvasMsg.UserId {
+							u.CurrentCanvasId = canvas.Id
+							canvas.OwnerId = u.Id
+							user = u
+						}
+					}
+					canvases = append(canvases, canvas)
+					mu.Unlock()
+					break
+				}
+				user = &User{}
+				user.Id = uuid.Must(uuid.NewV4()).String()
+				user.CurrentCanvasId = canvas.Id
+				user.Present = true
+				canvas.OwnerId = user.Id
+				mu.Lock()
+				users = append(users, user)
+				canvases = append(canvases, canvas)
+				mu.Unlock()
+				break
+			}
+		case ConnectToCanvas:
+			var ctcMessage ConnectToCanvasMessage
+			json.Unmarshal(initMessage.Data, &ctcMessage)
+			mu.Lock()
+			for _, cnv := range canvases {
+				if cnv.Id == ctcMessage.CanvasId {
+					canvas = cnv
+					break
+				}
+			}
+			mu.Unlock()
+			if canvas == nil {
+				// TODO: handle canvas not found
+				break
+			}
+			if len(ctcMessage.UserId) > 0 {
+				for _, u := range users {
+					if u.Id == ctcMessage.UserId {
+						u.CurrentCanvasId = canvas.Id
+						user = u
+					}
+				}
+				break
+			}
+			user = &User{}
+			user.Id = uuid.Must(uuid.NewV4()).String()
+			user.CurrentCanvasId = canvas.Id
+			user.Present = true
+			users = append(users, user)
+		default:
+			// only NewCanvas and CTC are init messages
+			break
+		}
+	} else {
+		// TODO: handle wrong init message
+	}
+
+	var room *Room
+	if canvas != nil {
+		mu.Lock()
+		for _, r := range socketRooms {
+			if r.CanvasId == canvas.Id {
+				room = r
+			}
+		}
+		mu.Unlock()
+		if room == nil {
+			room = &Room{
+				CanvasId:  canvas.Id,
+				Broadcast: make(chan []byte),
+			}
+			socketRooms = append(socketRooms, room)
+		}
+	}
+
+	// go handleRead(conn, userId)
+	// go handleWrite(conn, userId)
 }
 
 func handleRead(conn *websocket.Conn, userId int) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			mutex.Lock()
+			mu.Lock()
 			delete(clients, conn)
-			mutex.Unlock()
+			mu.Unlock()
 			fmt.Println("Error reading message:", err)
 		}
 		fmt.Printf("Received: %s\n", message)
@@ -101,7 +208,7 @@ func handleWrite(conn *websocket.Conn, userId int) {
 
 		message := <-roomBroadcasts[userRoom[userId]]
 
-		mutex.Lock()
+		mu.Lock()
 		for client := range clients {
 			err := client.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
@@ -109,6 +216,6 @@ func handleWrite(conn *websocket.Conn, userId int) {
 				delete(clients, client)
 			}
 		}
-		mutex.Unlock()
+		mu.Unlock()
 	}
 }

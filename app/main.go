@@ -134,42 +134,6 @@ func main() {
 
 	router.HandleFunc("GET /", home)
 
-	// router.HandleFunc("GET /websocket", func(w http.ResponseWriter, r *http.Request) {
-	// 	const wsMagicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-	// 	wsKey := r.Header.Get("Sec-WebSocket-Key")
-
-	// 	hasher := sha1.New()
-	// 	hasher.Write([]byte(wsKey + wsMagicString))
-
-	// 	sha1Sum := hasher.Sum(nil)
-
-	// 	acceptKey := base64.StdEncoding.EncodeToString(sha1Sum)
-
-	// 	w.Header().Add("Sec-WebSocket-Accept", acceptKey)
-	// 	w.Header().Add("Connection", "Upgrade")
-	// 	w.Header().Add("Upgrade", "websocket")
-	// 	w.WriteHeader(http.StatusSwitchingProtocols)
-
-	// 	// hijack tcp
-	// 	hj, ok := w.(http.Hijacker)
-	// 	if !ok {
-	// 		return
-	// 	}
-
-	// 	conn, _, err := hj.Hijack()
-	// 	if err != nil {
-	// 		log.Print(err.Error())
-	// 	}
-
-	// 	user := userIdCounter
-	// 	userIdCounter++
-
-	// 	userOutChannels[user] = make(chan []byte)
-
-	// 	go readLoop(conn, user)
-	// 	go writeLoop(conn, outgoing, user)
-	// })
-
 	router.HandleFunc("GET /websocket", handleWebsocket)
 
 	log.Println("Starting server at http://localhost:3000")
