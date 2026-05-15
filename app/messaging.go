@@ -8,7 +8,11 @@ const (
 	CanvasCreated
 	UserCreated
 	CursorUpdate
-	CanvasEvent
+
+	// Canvas Events
+	CreateRectEvent
+	RectPatch  // consquent size/property changes, not recorded as a whole in the event log
+	RectUpdate // the recorded event: accepted "threshold" where user mouse up
 )
 
 type Message struct {
@@ -37,4 +41,9 @@ type CursorUpdateMessage struct {
 	UserId         string `json:"user_id"`
 	CursorPosition Vec2   `json:"cursor_pos"`
 	Disconnected   bool   `json:"disconnected"`
+}
+
+type RectPatchMessage struct {
+	ShapeId string `json:"shape_id"`
+	Size    Vec2   `json:"size"`
 }

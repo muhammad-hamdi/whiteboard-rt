@@ -19,21 +19,21 @@ export interface Shape {
     filled   :boolean
 	points   :Vec2[]
 	text     :Text
-	color    :number
+	color    :string
 }
 
 export interface Text {
 	id       :string
 	size     :number
 	position :Vec2
-	color    :number
+	color    :string
 }
 
 export interface BrushStroke {
 	id         :string
 	line_width :number
 	points     :Vec2[]
-	color      :number
+	color      :string
 }
 
 export interface CanvasData {

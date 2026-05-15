@@ -1,5 +1,18 @@
 import { type Message, MessageType } from "./messaging.js"
-import { type Vec2 } from "./canvas_model.js"
+import { type Shape, type Canvas, type Vec2, ShapeType } from "./canvas_model.js"
+
+enum Tool {
+    Rect,
+    Circle,
+    Line,
+    Brush
+}
+
+let drawingState = {
+    currentTool: Tool.Rect,
+    mouseDown: false,
+    currentConstruct: {} as any
+}
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement
 canvas.width = window.innerWidth
@@ -15,46 +28,28 @@ if (!ctx) {
   throw new Error("Could not get 2d context from canvas");
 }
 
-// const texture = new ImageData(canvas.width, canvas.height)
-
-// for(let i = 0; i < texture.data.length; i++) {
-//     texture.data[i] = i/255
-// }
-
-// ctx.putImageData(texture, 0, 0)
-
 const wsUri = "ws://localhost:3000/websocket"
 const websocket = new WebSocket(wsUri)
 
 let keys: Record<string, boolean> = {}
 
-let mouseCurrent: Vec2 = {x:0,y:0}
-let mouseTarget: Vec2 = {x:0,y:0}
-let mouseEase = 0.1
-let mouseDown = false
-
-enum Shape { Rect, Circle }
-
-interface Entity {
-    position: Vec2
-    shape: Shape
-    width?: number
-    height?: number
-    radius?: number
-    color?: string
-    draw(): void
-}
-
-interface CanvasData {
-    id: string
-    cameraTarget: Vec2
-    objects: Entity[]
-}
-
-let canvasData: CanvasData = {
-    id: "",
+let pageState = {
     cameraTarget: {x:0,y:0},
-    objects: []
+    mouseCurrent: {x:0,y:0},
+    mouseTarget : {x:0,y:0},
+    mouseEase   : 0.1,
+    mouseDown   : false,
+}
+
+let wbCanvas: Canvas = {
+    id: "",
+    owner_id: "",
+    snapshot: {
+        shapes: [],
+        text: [],
+        brush_strokes: []
+    },
+    event_log: []
 }
 
 let cursors: Map<string, {p:Vec2, c:string}> = new Map()
@@ -68,47 +63,38 @@ const randColor = () => {
     return Math.floor(randRange(0.5)*0xFF + randRange(0.5)*0xFF00 + randRange(0.5)*0xFF0000).toString(16)
 }
 
-function drawRectangle(this: Entity) {
-    ctx.fillStyle = this.color as string
-    ctx.fillRect(this.position.x - canvasData.cameraTarget.x, this.position.y-canvasData.cameraTarget.y, this.width as number, this.height as number)
+function drawRectangle(s: Shape) {
+    ctx.fillStyle = s.color
+    ctx.fillRect(s.position.x - pageState.cameraTarget.x, s.position.y-pageState.cameraTarget.y, s.size.x, s.size.y)
 }
 
-function drawCircle(this: Entity) {
+function drawCircle(s: Shape) {
     ctx.beginPath()
-    ctx.fillStyle = this.color as string
+    ctx.fillStyle = s.color as string
     // ctx.moveTo(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y)
-    ctx.arc(this.position.x - canvasData.cameraTarget.x, this.position.y-canvasData.cameraTarget.y, this.radius as number, 0, 2*Math.PI, true)
+    ctx.arc(s.position.x - pageState.cameraTarget.x, s.position.y-pageState.cameraTarget.y, s.radius as number, 0, 2*Math.PI, true)
     ctx.fill()
     ctx.stroke()
 }
 
-let objects: Entity[] = []
-
-for(let i = 0; i < 50; i++) {
-    let s = Math.random() > 0.5 ? Shape.Rect : Shape.Circle
-    objects.push({
-        position: {x: Math.random()*canvas.width, y: Math.random()*canvas.height},
-        shape: s,
-        draw: s == Shape.Rect ? drawRectangle : drawCircle,
-        width: ((Math.random() + 0.5)/1.5)*100,
-        height: ((Math.random() + 0.5)/1.5)*100,
-        radius: ((Math.random() + 0.5)/1.5)*100,
-        color: "#" + Math.floor(randRange(0.5)*0xFF + randRange(0.5)*0xFF00 + randRange(0.5)*0xFF0000).toString(16)
-    })
+const sendMessage = (type: MessageType, data: any) => {
+    websocket.send(JSON.stringify(
+        {
+            type,
+            data
+        }
+    ))
 }
 
 const handleWebsocketMessages = (ev: MessageEvent) => {
     try {
         let v = JSON.parse(ev.data)
-        console.log(v);
         switch (v.type) {
             case MessageType.CanvasCreated:
-                console.log(v.data);
-                canvasData.id = v.data.canvas.id
-                history.pushState({}, "", canvasData.id)
+                wbCanvas.id = v.data.canvas.id
+                history.pushState({}, "", wbCanvas.id)
                 break;
             case MessageType.UserCreated:
-                console.log(v.data);
                 localStorage.setItem("user", JSON.stringify(v.data.user))
                 localStorage.setItem("user_id", v.data.user.id)
                 break;
@@ -127,6 +113,27 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     cursors.set(v.data.user_id, old)
                 }
                 break;
+            case MessageType.CreateRectEvent:
+                {
+                    let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1];
+                    if(lastShape) {
+                        if(lastShape.id) {
+                            wbCanvas.snapshot.shapes.push(v.data)
+                        } else {
+                            lastShape.id = v.data.id
+                            drawingState.currentConstruct.id = v.data.id
+                        }
+                    } else {
+                        wbCanvas.snapshot.shapes.push(v.data)
+                    }
+                }
+            case MessageType.RectPatch:
+                {
+                    let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
+                    if(shape) {
+                        shape.size = v.data.size
+                    }
+                }
             default:
                 break;
         }
@@ -137,35 +144,30 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
 
 if(location.pathname.slice(1).split("/")[0]?.length == 36) {
     // Init message ConnectToCanvas
-    canvasData.id = location.pathname.slice(1).split("/")[0] as string
+    wbCanvas.id = location.pathname.slice(1).split("/")[0] as string
 
     websocket.addEventListener("open", (ev) => {
         console.log("Socket Connected");
         // init message
-        websocket.send(JSON.stringify({
-            type: MessageType.ConnectToCanvas,
-            data: {
+        sendMessage(
+            MessageType.ConnectToCanvas, {
                 user_id: localStorage.getItem("user_id") ?? "",
-                canvas_id: canvasData.id
+                canvas_id: wbCanvas.id
             }
-        }))
+        )
     })
 
     websocket.addEventListener("message", handleWebsocketMessages)
 } else {
-    // Init message NewCanvas
-    // canvasData.id = crypto.randomUUID()
-    // history.pushState({}, "", canvasData.id)
-
     websocket.addEventListener("open", (ev) => {
         console.log("Socket Connected");
         // init message
-        websocket.send(JSON.stringify({
-            type: MessageType.NewCanvas,
-            data: {
+        sendMessage(
+            MessageType.NewCanvas,
+            {
                 user_id: localStorage.getItem("user_id") ?? ""
             }
-        }))
+        )
     })
 
     websocket.addEventListener("message", handleWebsocketMessages)
@@ -173,35 +175,28 @@ if(location.pathname.slice(1).split("/")[0]?.length == 36) {
 
 const update = (time: DOMHighResTimeStamp) => {
     // UPDATE
-    if(keys["KeyA"]) {
-        canvasData.cameraTarget.x -= 10
-    }
-    if(keys["KeyD"]) {
-        canvasData.cameraTarget.x += 10
-    }
-    if(keys["KeyW"]) {
-        canvasData.cameraTarget.y -= 10
-    }
-    if(keys["KeyS"]) {
-        canvasData.cameraTarget.y += 10
-    }
+    let mouseDelta = {x: pageState.mouseTarget.x - pageState.mouseCurrent.x, y: pageState.mouseTarget.y - pageState.mouseCurrent.y}
 
-    let mouseDelta = {x: mouseTarget.x - mouseCurrent.x, y: mouseTarget.y - mouseCurrent.y}
+    pageState.mouseCurrent.x += mouseDelta.x
+    pageState.mouseCurrent.y += mouseDelta.y
 
-    mouseCurrent.x += mouseDelta.x
-    mouseCurrent.y += mouseDelta.y
-
-    if(mouseDown && keys["ControlLeft"]) {
-        canvasData.cameraTarget.x -= mouseDelta.x
-        canvasData.cameraTarget.y -= mouseDelta.y
+    if(pageState.mouseDown && keys["ControlLeft"]) {
+        pageState.cameraTarget.x -= mouseDelta.x
+        pageState.cameraTarget.y -= mouseDelta.y
     }
 
     // DRAW
-    ctx.fillStyle = `rgb(90, 110, 100)`
+    ctx.fillStyle = `#F5F5F5`
     ctx.fillRect(0,0,canvas.width, canvas.height)
 
-    for(let e of objects) {
-        e.draw()
+    for(let e of wbCanvas.snapshot.shapes) {
+        switch (e.type) {
+            case ShapeType.Rect:
+                drawRectangle(e)
+                break;
+            default:
+                break;
+        }
     }
 
     for(const [k,v] of cursors) {
@@ -249,41 +244,93 @@ document.addEventListener("visibilitychange", () => {
 //#endregion
 
 window.addEventListener("mousemove", (ev) => {
-    mouseTarget.x = ev.clientX
-    mouseTarget.y = ev.clientY
-    if(websocket.OPEN && keys["ControlLeft"] && mouseDown) {
-        websocket.send(JSON.stringify({
-            id: canvasData.id,
-            cameraTarget: canvasData.cameraTarget
-        }))
-    }
+    pageState.mouseTarget.x = ev.clientX
+    pageState.mouseTarget.y = ev.clientY
 
     if(websocket.OPEN) {
-        websocket.send(JSON.stringify({
-            type: MessageType.CursorUpdate,
-            data: {
+        sendMessage(
+            MessageType.CursorUpdate,
+            {
                 user_id: localStorage.getItem("user_id"),
-                cursor_pos: mouseTarget
+                cursor_pos: pageState.mouseTarget
             }
-        }))
+        )
+
+        if(drawingState.currentConstruct && drawingState.mouseDown) {
+            switch (drawingState.currentTool) {
+                case Tool.Rect:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1]
+                        if(lastShape) {
+                            lastShape.size = {
+                                x: ev.clientX - s.position.x,
+                                y: ev.clientY - s.position.y
+                            }
+                        }
+                        sendMessage(
+                            MessageType.RectPatch,
+                            {
+                                shape_id: s.id,
+                                size: {
+                                    x: ev.clientX - s.position.x,
+                                    y: ev.clientY - s.position.y
+                                }
+                            }
+                        )
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 })
 
 window.addEventListener('beforeunload', () => {
     // Check if the socket is open before trying to send
     if (websocket.readyState === WebSocket.OPEN) {
-        websocket.send(JSON.stringify({
-            type: MessageType.CursorUpdate,
-            data: {
+        sendMessage(
+            MessageType.CursorUpdate,
+            {
                 user_id: localStorage.getItem("user_id"),
                 cursor_pos: {x:null,y:null},
                 disconnected: true
             }
-        }));
+        );
         // Optional: Gracefully close the connection manually
         websocket.close();
     }
 });
 
-window.addEventListener("mousedown", () => mouseDown = true)
-window.addEventListener("mouseup", () => mouseDown = false)
+window.addEventListener("mousedown", () => {
+    pageState.mouseDown = true
+    drawingState.mouseDown = true
+    switch (drawingState.currentTool) {
+        case Tool.Rect:
+            {
+                drawingState.currentConstruct = {
+                    type     :ShapeType.Rect,
+                    position :{...pageState.mouseTarget},
+                    size     :{x:0,y:0},
+                    radius   :0,
+                    filled   :false,
+                    points   :[],
+                    text     :{},
+                    color    :"#282538",
+                }
+                wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
+                sendMessage(
+                    MessageType.CreateRectEvent,
+                    drawingState.currentConstruct
+                )
+            }
+            break;
+        default:
+            break;
+    }
+})
+window.addEventListener("mouseup", () => {
+    pageState.mouseDown = false
+    drawingState.mouseDown = false
+})

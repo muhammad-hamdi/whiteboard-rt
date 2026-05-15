@@ -22,29 +22,29 @@ const (
 )
 
 type Shape struct {
-	Id       string
-	Type     ShapeType
-	Position Vec2
-	Size     Vec2
-	Radius   float32
-	Filled   bool
-	Points   []Vec2
-	Text     Text
-	Color    uint
+	Id       string    `json:"id"`
+	Type     ShapeType `json:"type"`
+	Position Vec2      `json:"position"`
+	Size     Vec2      `json:"size"`
+	Radius   float32   `json:"radius"`
+	Filled   bool      `json:"filled"`
+	Points   []Vec2    `json:"points"`
+	Text     Text      `json:"text"`
+	Color    string    `json:"color"`
 }
 
 type Text struct {
 	Id       string
 	Size     int
 	Position Vec2
-	Color    uint
+	Color    string
 }
 
 type BrushStroke struct {
 	Id        string
 	LineWidth float32
 	Points    []Vec2
-	Color     uint
+	Color     string
 }
 
 type CanvasData struct {

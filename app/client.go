@@ -10,6 +10,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -74,6 +75,68 @@ func (c *Client) readPump() {
 		case NewCanvas:
 		case ConnectToCanvas:
 		case CursorUpdate:
+		case CreateRectEvent:
+			{
+				// TODO: store the create event in the log
+				var s Shape
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &s)
+				s.Id = uuid.Must(uuid.NewV4()).String()
+				var canvas *Canvas
+				mu.Lock()
+				for _, cnv := range canvases {
+					if cnv.Id == c.user.CurrentCanvasId {
+						canvas = cnv
+					}
+				}
+				mu.Unlock()
+				if canvas == nil {
+					// TODO: handle nil canvas
+				}
+				mu.Lock()
+				if canvas.Snapshot == nil {
+					canvas.Snapshot = &CanvasData{}
+				}
+				if canvas.Snapshot.Shapes == nil {
+					canvas.Snapshot.Shapes = make([]*Shape, 0)
+				}
+				canvas.Snapshot.Shapes = append(canvas.Snapshot.Shapes, &s)
+				mu.Unlock()
+				msg = Message{
+					Type: CreateRectEvent,
+					Data: s,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case RectPatch:
+			{
+				var p RectPatchMessage
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &p)
+
+				mu.Lock()
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								s.Size = p.Size
+								break
+							}
+						}
+						break
+					}
+				}
+				mu.Unlock()
+				msg = Message{
+					Type: RectPatch,
+					Data: p,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case RectUpdate:
+			{
+				// TODO: store the update event in the log
+			}
 		}
 
 		c.room.broadcast <- message

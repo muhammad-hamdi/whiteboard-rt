@@ -4,7 +4,11 @@ export enum MessageType {
     CanvasCreated,
 	UserCreated,
     CursorUpdate,
-    CanvasEvent
+
+    // Canvas Events
+    CreateRectEvent,
+    RectPatch,
+    RectUpdate
 }
 
 export interface Message {
