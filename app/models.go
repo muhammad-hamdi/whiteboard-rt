@@ -34,29 +34,32 @@ type Shape struct {
 }
 
 type Text struct {
-	Id       string
-	Size     int
-	Position Vec2
-	Color    string
+	Id       string `json:"id"`
+	Size     int    `json:"size"`
+	Position Vec2   `json:"position"`
+	Color    string `json:"color"`
 }
 
 type BrushStroke struct {
-	Id        string
-	LineWidth float32
-	Points    []Vec2
-	Color     string
+	Id        string  `json:"id"`
+	LineWidth float32 `json:"line_width"`
+	Points    []Vec2  `json:"points"`
+	Color     string  `json:"color"`
 }
 
 type CanvasData struct {
-	Shapes       []*Shape
-	Text         []*Text
-	BrushStrokes []*BrushStroke
+	Shapes       []*Shape       `json:"shapes"`
+	Text         []*Text        `json:"text"`
+	BrushStrokes []*BrushStroke `json:"brush_stroke"`
 }
 
 type EventType int
 
 const (
 	CreatRect EventType = iota
+	UpdateRect
+	CreateCircle
+	UpdateCircle
 )
 
 type Event struct {

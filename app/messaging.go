@@ -10,9 +10,25 @@ const (
 	CursorUpdate
 
 	// Canvas Events
-	CreateRectEvent
+	RectCreate
 	RectPatch  // consquent size/property changes, not recorded as a whole in the event log
 	RectUpdate // the recorded event: accepted "threshold" where user mouse up
+
+	CircleCreate
+	CirclePatch
+	CircleUpdate
+
+	LineCreate
+	LinePatch
+	LineUpdate
+
+	PathCreate
+	PathPatch
+	PathUpdate
+
+	BrushCreate
+	BrushPatch
+	BrushUpdate
 )
 
 type Message struct {
@@ -43,7 +59,14 @@ type CursorUpdateMessage struct {
 	Disconnected   bool   `json:"disconnected"`
 }
 
+// TODO: should have a more generic struct to handle different properties with rtti
+// like rect color, filled, text, etc.
 type RectPatchMessage struct {
 	ShapeId string `json:"shape_id"`
 	Size    Vec2   `json:"size"`
+}
+
+type CirclePatchMessage struct {
+	ShapeId string  `json:"shape_id"`
+	Radius  float32 `json:"radius"`
 }

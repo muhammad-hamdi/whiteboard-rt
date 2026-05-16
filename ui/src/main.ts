@@ -39,6 +39,7 @@ let pageState = {
     mouseTarget : {x:0,y:0},
     mouseEase   : 0.1,
     mouseDown   : false,
+    zoomLevel   : 1.0 //TODO: zooming, attempted it, seems like a big headache in the canvas 2d api, will try again later
 }
 
 let wbCanvas: Canvas = {
@@ -65,7 +66,12 @@ const randColor = () => {
 
 function drawRectangle(s: Shape) {
     ctx.fillStyle = s.color
-    ctx.fillRect(s.position.x - pageState.cameraTarget.x, s.position.y-pageState.cameraTarget.y, s.size.x, s.size.y)
+    ctx.fillRect(
+        s.position.x - pageState.cameraTarget.x,
+        s.position.y-pageState.cameraTarget.y,
+        s.size.x,
+        s.size.y
+    )
 }
 
 function drawCircle(s: Shape) {
@@ -91,7 +97,7 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
         let v = JSON.parse(ev.data)
         switch (v.type) {
             case MessageType.CanvasCreated:
-                wbCanvas = {...v.data.canvas}
+                wbCanvas = v.data.canvas
                 history.pushState({}, "", wbCanvas.id)
                 break;
             case MessageType.UserCreated:
@@ -113,7 +119,7 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     cursors.set(v.data.user_id, old)
                 }
                 break;
-            case MessageType.CreateRectEvent:
+            case MessageType.RectCreate:
                 {
                     let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1];
                     if(lastShape) {
@@ -132,6 +138,28 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
                     if(shape) {
                         shape.size = v.data.size
+                    }
+                    console.log(v.data);
+                }
+            case MessageType.CircleCreate:
+                {
+                    let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1];
+                    if(lastShape) {
+                        if(lastShape.id) {
+                            wbCanvas.snapshot.shapes.push(v.data)
+                        } else {
+                            lastShape.id = v.data.id
+                            drawingState.currentConstruct.id = v.data.id
+                        }
+                    } else {
+                        wbCanvas.snapshot.shapes.push(v.data)
+                    }
+                }
+            case MessageType.CirclePatch:
+                {
+                    let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
+                    if(shape) {
+                        shape.radius = v.data.radius
                     }
                 }
             default:
@@ -194,6 +222,8 @@ const update = (time: DOMHighResTimeStamp) => {
             case ShapeType.Rect:
                 drawRectangle(e)
                 break;
+            case ShapeType.Circle:
+                drawCircle(e)
             default:
                 break;
         }
@@ -221,6 +251,14 @@ requestAnimationFrame(update)
 
 window.addEventListener("keydown", (ev) => {
     keys[ev.code] = true
+
+    if(keys["KeyC"]) {
+        drawingState.currentTool = Tool.Circle
+    }
+
+    if(keys["KeyR"]) {
+        drawingState.currentTool = Tool.Rect
+    }
 })
 
 window.addEventListener("keyup", (ev) => {
@@ -247,7 +285,7 @@ window.addEventListener("mousemove", (ev) => {
     pageState.mouseTarget.x = ev.clientX
     pageState.mouseTarget.y = ev.clientY
 
-    if(websocket.OPEN) {
+    if(websocket.readyState == WebSocket.OPEN) {
         sendMessage(
             MessageType.CursorUpdate,
             {
@@ -256,26 +294,47 @@ window.addEventListener("mousemove", (ev) => {
             }
         )
 
-        if(drawingState.currentConstruct && drawingState.mouseDown) {
+        if(drawingState.currentConstruct.id && drawingState.mouseDown) {
             switch (drawingState.currentTool) {
                 case Tool.Rect:
                     {
                         let s = drawingState.currentConstruct as Shape
-                        let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1]
-                        if(lastShape) {
-                            lastShape.size = {
-                                x: ev.clientX - s.position.x,
-                                y: ev.clientY - s.position.y
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        if(shape) {
+                            shape.size = {
+                                x: (ev.clientX + pageState.cameraTarget.x) - s.position.x,
+                                y: (ev.clientY + pageState.cameraTarget.y) - s.position.y
                             }
                         }
+                        console.log(s);
                         sendMessage(
                             MessageType.RectPatch,
                             {
                                 shape_id: s.id,
                                 size: {
-                                    x: ev.clientX - s.position.x,
-                                    y: ev.clientY - s.position.y
+                                    x: (ev.clientX + pageState.cameraTarget.x) - s.position.x,
+                                    y: (ev.clientY + pageState.cameraTarget.y) - s.position.y
                                 }
+                            }
+                        )
+                    }
+                    break;
+                case Tool.Circle:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        let r = Math.sqrt(
+                            Math.pow((ev.clientX + pageState.cameraTarget.x) - s.position.x, 2)
+                            + Math.pow((ev.clientY + pageState.cameraTarget.y) - s.position.y, 2)
+                        )
+                        if(shape) {
+                            shape.radius = r
+                        }
+                        sendMessage(
+                            MessageType.CirclePatch,
+                            {
+                                shape_id: s.id,
+                                radius: r
                             }
                         )
                     }
@@ -285,6 +344,133 @@ window.addEventListener("mousemove", (ev) => {
             }
         }
     }
+})
+
+window.addEventListener("mousedown", () => {
+    pageState.mouseDown = true
+
+    if(
+        keys["ControlLeft"]  ||
+        keys["ControlRight"] ||
+        keys["ShiftLeft"]    ||
+        keys["ShiftRight"]   ||
+        keys["AltLeft"]      ||
+        keys["AltRight"]     ||
+        keys["MetaLeft"]     ||
+        keys["MetaRight"]
+    ) {
+        return
+    }
+
+    drawingState.mouseDown = true
+    switch (drawingState.currentTool) {
+        case Tool.Rect:
+            {
+                drawingState.currentConstruct = {
+                    type     :ShapeType.Rect,
+                    position :{
+                        x: pageState.mouseTarget.x + pageState.cameraTarget.x,
+                        y: pageState.mouseTarget.y + pageState.cameraTarget.y,
+                    },
+                    size     :{x:0,y:0},
+                    radius   :0,
+                    filled   :false,
+                    points   :[],
+                    text     :{},
+                    color    :"#282538",
+                }
+                wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
+                console.log(drawingState.currentConstruct);
+                sendMessage(
+                    MessageType.RectCreate,
+                    drawingState.currentConstruct
+                )
+            }
+            break;
+        case Tool.Circle:
+            {
+                drawingState.currentConstruct = {
+                    type     :ShapeType.Circle,
+                    position :{
+                        x: pageState.mouseTarget.x + pageState.cameraTarget.x,
+                        y: pageState.mouseTarget.y + pageState.cameraTarget.y,
+                    },
+                    size     :{x:0,y:0},
+                    radius   :0,
+                    filled   :false,
+                    points   :[],
+                    text     :{},
+                    color    :"#282538",
+                }
+                wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
+                console.log(wbCanvas.snapshot.shapes);
+                sendMessage(
+                    MessageType.CircleCreate,
+                    drawingState.currentConstruct
+                )
+            }
+            break;
+        default:
+            break;
+    }
+})
+
+window.addEventListener("mouseup", (ev: MouseEvent) => {
+    if(websocket.readyState == WebSocket.OPEN) {
+        if(drawingState.currentConstruct.id && drawingState.mouseDown) {
+            switch (drawingState.currentTool) {
+                case Tool.Rect:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        if(shape) {
+                            shape.size = {
+                                x: (ev.clientX + pageState.cameraTarget.x) - s.position.x,
+                                y: (ev.clientY + pageState.cameraTarget.y) - s.position.y
+                            }
+                        }
+                        sendMessage(
+                            MessageType.RectUpdate,
+                            {
+                                shape_id: s.id,
+                                size: {
+                                    x: (ev.clientX + pageState.cameraTarget.x) - s.position.x,
+                                    y: (ev.clientY + pageState.cameraTarget.y) - s.position.y
+                                }
+                            }
+                        )
+
+                    }
+                    break;
+                case Tool.Circle:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        let r = Math.sqrt(
+                            Math.pow((ev.clientX + pageState.cameraTarget.x) - s.position.x, 2)
+                            + Math.pow((ev.clientY + pageState.cameraTarget.y) - s.position.y, 2)
+                        )
+                        if(shape) {
+                            shape.radius = r
+                        }
+                        sendMessage(
+                            MessageType.CircleUpdate,
+                            {
+                                shape_id: s.id,
+                                radius: r
+                            }
+                        )
+
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    pageState.mouseDown = false
+    drawingState.mouseDown = false
 })
 
 window.addEventListener('beforeunload', () => {
@@ -302,35 +488,3 @@ window.addEventListener('beforeunload', () => {
         websocket.close();
     }
 });
-
-window.addEventListener("mousedown", () => {
-    pageState.mouseDown = true
-    drawingState.mouseDown = true
-    switch (drawingState.currentTool) {
-        case Tool.Rect:
-            {
-                drawingState.currentConstruct = {
-                    type     :ShapeType.Rect,
-                    position :{...pageState.mouseTarget},
-                    size     :{x:0,y:0},
-                    radius   :0,
-                    filled   :false,
-                    points   :[],
-                    text     :{},
-                    color    :"#282538",
-                }
-                wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
-                sendMessage(
-                    MessageType.CreateRectEvent,
-                    drawingState.currentConstruct
-                )
-            }
-            break;
-        default:
-            break;
-    }
-})
-window.addEventListener("mouseup", () => {
-    pageState.mouseDown = false
-    drawingState.mouseDown = false
-})

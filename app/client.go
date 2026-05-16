@@ -75,9 +75,8 @@ func (c *Client) readPump() {
 		case NewCanvas:
 		case ConnectToCanvas:
 		case CursorUpdate:
-		case CreateRectEvent:
+		case RectCreate:
 			{
-				// TODO: store the create event in the log
 				var s Shape
 				t, _ := json.Marshal(msg.Data)
 				json.Unmarshal(t, &s)
@@ -101,9 +100,15 @@ func (c *Client) readPump() {
 					canvas.Snapshot.Shapes = make([]*Shape, 0)
 				}
 				canvas.Snapshot.Shapes = append(canvas.Snapshot.Shapes, &s)
+				canvas.EventLog = append(canvas.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      CreatRect,
+					Value:     t,
+				})
 				mu.Unlock()
 				msg = Message{
-					Type: CreateRectEvent,
+					Type: RectCreate,
 					Data: s,
 				}
 				message, _ = json.Marshal(msg)
@@ -135,7 +140,137 @@ func (c *Client) readPump() {
 			}
 		case RectUpdate:
 			{
-				// TODO: store the update event in the log
+				var p RectPatchMessage
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &p)
+
+				mu.Lock()
+				var cnv *Canvas
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								cnv = canv
+								s.Size = p.Size
+								break
+							}
+						}
+						break
+					}
+				}
+
+				ev, _ := json.Marshal(p.Size)
+				cnv.EventLog = append(cnv.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      UpdateRect,
+					Value:     ev,
+				})
+				mu.Unlock()
+				msg = Message{
+					Type: RectPatch,
+					Data: p,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case CircleCreate:
+			{
+				var s Shape
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &s)
+				s.Id = uuid.Must(uuid.NewV4()).String()
+				var canvas *Canvas
+				mu.Lock()
+				for _, cnv := range canvases {
+					if cnv.Id == c.user.CurrentCanvasId {
+						canvas = cnv
+					}
+				}
+				mu.Unlock()
+				if canvas == nil {
+					// TODO: handle nil canvas
+				}
+				mu.Lock()
+				if canvas.Snapshot == nil {
+					canvas.Snapshot = &CanvasData{}
+				}
+				if canvas.Snapshot.Shapes == nil {
+					canvas.Snapshot.Shapes = make([]*Shape, 0)
+				}
+				log.Println(s)
+				canvas.Snapshot.Shapes = append(canvas.Snapshot.Shapes, &s)
+				canvas.EventLog = append(canvas.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      CreateCircle,
+					Value:     t,
+				})
+				mu.Unlock()
+				msg = Message{
+					Type: CircleCreate,
+					Data: s,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case CirclePatch:
+			{
+				var p CirclePatchMessage
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &p)
+
+				mu.Lock()
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								s.Radius = p.Radius
+								break
+							}
+						}
+						break
+					}
+				}
+				mu.Unlock()
+				msg = Message{
+					Type: CirclePatch,
+					Data: p,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case CircleUpdate:
+			{
+				var p CirclePatchMessage
+				t, _ := json.Marshal(msg.Data)
+				json.Unmarshal(t, &p)
+
+				mu.Lock()
+				var cnv *Canvas
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								cnv = canv
+								s.Radius = p.Radius
+								break
+							}
+						}
+						break
+					}
+				}
+
+				ev, _ := json.Marshal(p.Radius)
+				cnv.EventLog = append(cnv.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      UpdateCircle,
+					Value:     ev,
+				})
+				mu.Unlock()
+				msg = Message{
+					Type: CirclePatch,
+					Data: p,
+				}
+				message, _ = json.Marshal(msg)
 			}
 		}
 

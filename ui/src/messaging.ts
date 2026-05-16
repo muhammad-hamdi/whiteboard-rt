@@ -6,9 +6,25 @@ export enum MessageType {
     CursorUpdate,
 
     // Canvas Events
-    CreateRectEvent,
+    RectCreate,
     RectPatch,
-    RectUpdate
+    RectUpdate,
+
+    CircleCreate,
+	CirclePatch,
+	CircleUpdate,
+
+	LineCreate,
+	LinePatch,
+	LineUpdate,
+
+	PathCreate,
+	PathPatch,
+	PathUpdate,
+
+	BrushCreate,
+	BrushPatch,
+	BrushUpdate,
 }
 
 export interface Message {
