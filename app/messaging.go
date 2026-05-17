@@ -1,5 +1,7 @@
 package main
 
+import "encoding/json"
+
 type MessageType int
 
 const (
@@ -32,8 +34,8 @@ const (
 )
 
 type Message struct {
-	Type MessageType `json:"type"`
-	Data any         `json:"data"`
+	Type MessageType     `json:"type"`
+	Data json.RawMessage `json:"data"`
 }
 
 type NewCanvasMessage struct {

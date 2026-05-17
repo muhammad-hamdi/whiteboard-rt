@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"time"
@@ -67,7 +66,9 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+
+		// TODO: move the parsing and responses to a map
+		// or vtable like thing -> map[MessageType]func(data json.RawMessage)
 
 		var msg Message
 		json.Unmarshal(message, &msg)
@@ -78,21 +79,21 @@ func (c *Client) readPump() {
 		case RectCreate:
 			{
 				var s Shape
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &s)
+				json.Unmarshal(msg.Data, &s)
 				s.Id = uuid.Must(uuid.NewV4()).String()
+				data, _ := json.Marshal(s)
+
 				var canvas *Canvas
+
 				mu.Lock()
 				for _, cnv := range canvases {
 					if cnv.Id == c.user.CurrentCanvasId {
 						canvas = cnv
 					}
 				}
-				mu.Unlock()
 				if canvas == nil {
 					// TODO: handle nil canvas
 				}
-				mu.Lock()
 				if canvas.Snapshot == nil {
 					canvas.Snapshot = &CanvasData{}
 				}
@@ -104,20 +105,20 @@ func (c *Client) readPump() {
 					UserId:    c.user.Id,
 					Timestamp: time.Now().Unix(),
 					Type:      CreatRect,
-					Value:     t,
+					Value:     data, // because shape id is assigned here
 				})
 				mu.Unlock()
+
 				msg = Message{
 					Type: RectCreate,
-					Data: s,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
 		case RectPatch:
 			{
 				var p RectPatchMessage
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &p)
+				json.Unmarshal(msg.Data, &p)
 
 				mu.Lock()
 				for _, canv := range canvases {
@@ -132,17 +133,18 @@ func (c *Client) readPump() {
 					}
 				}
 				mu.Unlock()
+
+				data, _ := json.Marshal(p)
 				msg = Message{
 					Type: RectPatch,
-					Data: p,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
 		case RectUpdate:
 			{
 				var p RectPatchMessage
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &p)
+				json.Unmarshal(msg.Data, &p)
 
 				mu.Lock()
 				var cnv *Canvas
@@ -158,65 +160,63 @@ func (c *Client) readPump() {
 						break
 					}
 				}
-
-				ev, _ := json.Marshal(p.Size)
 				cnv.EventLog = append(cnv.EventLog, &Event{
 					UserId:    c.user.Id,
 					Timestamp: time.Now().Unix(),
 					Type:      UpdateRect,
-					Value:     ev,
+					Value:     msg.Data,
 				})
 				mu.Unlock()
+
+				data, _ := json.Marshal(p)
 				msg = Message{
 					Type: RectPatch,
-					Data: p,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
 		case CircleCreate:
 			{
 				var s Shape
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &s)
+				json.Unmarshal(msg.Data, &s)
 				s.Id = uuid.Must(uuid.NewV4()).String()
 				var canvas *Canvas
+
 				mu.Lock()
 				for _, cnv := range canvases {
 					if cnv.Id == c.user.CurrentCanvasId {
 						canvas = cnv
 					}
 				}
-				mu.Unlock()
 				if canvas == nil {
 					// TODO: handle nil canvas
 				}
-				mu.Lock()
 				if canvas.Snapshot == nil {
 					canvas.Snapshot = &CanvasData{}
 				}
 				if canvas.Snapshot.Shapes == nil {
 					canvas.Snapshot.Shapes = make([]*Shape, 0)
 				}
-				log.Println(s)
 				canvas.Snapshot.Shapes = append(canvas.Snapshot.Shapes, &s)
 				canvas.EventLog = append(canvas.EventLog, &Event{
 					UserId:    c.user.Id,
 					Timestamp: time.Now().Unix(),
 					Type:      CreateCircle,
-					Value:     t,
+					Value:     msg.Data,
 				})
 				mu.Unlock()
+
+				data, _ := json.Marshal(s)
 				msg = Message{
 					Type: CircleCreate,
-					Data: s,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
 		case CirclePatch:
 			{
 				var p CirclePatchMessage
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &p)
+				json.Unmarshal(msg.Data, &p)
 
 				mu.Lock()
 				for _, canv := range canvases {
@@ -231,17 +231,18 @@ func (c *Client) readPump() {
 					}
 				}
 				mu.Unlock()
+
+				data, _ := json.Marshal(p)
 				msg = Message{
 					Type: CirclePatch,
-					Data: p,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
 		case CircleUpdate:
 			{
 				var p CirclePatchMessage
-				t, _ := json.Marshal(msg.Data)
-				json.Unmarshal(t, &p)
+				json.Unmarshal(msg.Data, &p)
 
 				mu.Lock()
 				var cnv *Canvas
@@ -258,17 +259,18 @@ func (c *Client) readPump() {
 					}
 				}
 
-				ev, _ := json.Marshal(p.Radius)
 				cnv.EventLog = append(cnv.EventLog, &Event{
 					UserId:    c.user.Id,
 					Timestamp: time.Now().Unix(),
 					Type:      UpdateCircle,
-					Value:     ev,
+					Value:     msg.Data,
 				})
 				mu.Unlock()
+
+				data, _ := json.Marshal(p)
 				msg = Message{
 					Type: CirclePatch,
-					Data: p,
+					Data: data,
 				}
 				message, _ = json.Marshal(msg)
 			}
@@ -299,24 +301,12 @@ func (c *Client) writePump() {
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
+			err := c.conn.WriteMessage(websocket.TextMessage, message)
+
 			if err != nil {
 				return
 			}
-			w.Write(message)
-
-			// Add queued chat messages to the current websocket message.
-			// n := len(c.send)
-			// for i := 0; i < n; i++ {
-			// 	w.Write(newline)
-			// 	w.Write(<-c.send)
-			// }
-
-			if err := w.Close(); err != nil {
-				return
-			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

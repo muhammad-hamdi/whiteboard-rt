@@ -171,22 +171,24 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	canvasCreatedEvent := CanvasCreatedMessage{
 		Canvas: *canvas,
 	}
+	data, _ := json.Marshal(canvasCreatedEvent)
 	resMessage := Message{
 		Type: CanvasCreated,
-		Data: canvasCreatedEvent,
+		Data: data,
 	}
-	data, _ := json.Marshal(resMessage)
+	data, _ = json.Marshal(resMessage)
 	client.send <- data
 
 	if userCreated {
 		userCreatedEvent := UserCreatedMessage{
 			User: *user,
 		}
+		data, _ := json.Marshal(userCreatedEvent)
 		message := Message{
 			Type: UserCreated,
-			Data: userCreatedEvent,
+			Data: data,
 		}
-		data, _ := json.Marshal(message)
+		data, _ = json.Marshal(message)
 		client.send <- data
 	}
 
