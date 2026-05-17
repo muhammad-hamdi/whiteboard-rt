@@ -65,22 +65,35 @@ const randColor = () => {
 }
 
 function drawRectangle(s: Shape) {
-    ctx.fillStyle = s.color
-    ctx.fillRect(
+    // ctx.fillStyle = s.color
+    // ctx.fillRect(
+    //     s.position.x - pageState.cameraTarget.x,
+    //     s.position.y-pageState.cameraTarget.y,
+    //     s.size.x,
+    //     s.size.y
+    // )
+
+    ctx.strokeStyle = s.color
+    ctx.lineWidth = 5
+    ctx.strokeRect(
         s.position.x - pageState.cameraTarget.x,
         s.position.y-pageState.cameraTarget.y,
         s.size.x,
         s.size.y
     )
+    ctx.lineWidth = 1
 }
 
 function drawCircle(s: Shape) {
     ctx.beginPath()
-    ctx.fillStyle = s.color as string
+    // ctx.fillStyle = s.color as string
     // ctx.moveTo(this.position.x - cameraTarget.x, this.position.y-cameraTarget.y)
     ctx.arc(s.position.x - pageState.cameraTarget.x, s.position.y-pageState.cameraTarget.y, s.radius as number, 0, 2*Math.PI, true)
-    ctx.fill()
+    // ctx.fill()
+    ctx.strokeStyle = s.color
+    ctx.lineWidth = 2
     ctx.stroke()
+    ctx.lineWidth = 1
 }
 
 const sendMessage = (type: MessageType, data: any) => {
@@ -133,14 +146,15 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                         wbCanvas.snapshot.shapes.push(v.data)
                     }
                 }
+                break;
             case MessageType.RectPatch:
                 {
                     let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
                     if(shape) {
                         shape.size = v.data.size
                     }
-                    console.log(v.data);
                 }
+                break;
             case MessageType.CircleCreate:
                 {
                     let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1];
@@ -155,6 +169,7 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                         wbCanvas.snapshot.shapes.push(v.data)
                     }
                 }
+                break;
             case MessageType.CirclePatch:
                 {
                     let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
@@ -162,6 +177,7 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                         shape.radius = v.data.radius
                     }
                 }
+                break;
             default:
                 break;
         }
@@ -306,7 +322,6 @@ window.addEventListener("mousemove", (ev) => {
                                 y: (ev.clientY + pageState.cameraTarget.y) - s.position.y
                             }
                         }
-                        console.log(s);
                         sendMessage(
                             MessageType.RectPatch,
                             {
@@ -380,7 +395,6 @@ window.addEventListener("mousedown", () => {
                     color    :"#282538",
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
-                console.log(drawingState.currentConstruct);
                 sendMessage(
                     MessageType.RectCreate,
                     drawingState.currentConstruct
@@ -403,7 +417,6 @@ window.addEventListener("mousedown", () => {
                     color    :"#282538",
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
-                console.log(wbCanvas.snapshot.shapes);
                 sendMessage(
                     MessageType.CircleCreate,
                     drawingState.currentConstruct
