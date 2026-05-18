@@ -4,7 +4,8 @@ import { type Shape, type Canvas, type Vec2, ShapeType } from "./canvas_model.js
 enum Tool {
     Rect,
     Circle,
-    Line,
+    Line, // two points
+    Path, // multiple points, can even add fancy stuff like Bezier-curves
     Brush
 }
 
@@ -97,6 +98,17 @@ function drawCircle(s: Shape) {
     ctx.lineWidth = 1
 }
 
+function drawLine(s: Shape) {
+    ctx.beginPath()
+    ctx.moveTo(s.points[0]!.x, s.points[0]!.y)
+    ctx.lineTo(s.points[1]!.x, s.points[1]!.y)
+
+    ctx.strokeStyle = s.color
+    ctx.lineWidth = 5
+    ctx.stroke()
+    ctx.lineWidth = 1
+}
+
 const sendMessage = (type: MessageType, data: any) => {
     websocket.send(JSON.stringify(
         {
@@ -179,6 +191,29 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     }
                 }
                 break;
+            case MessageType.LineCreate:
+                {
+                    let lastShape = wbCanvas.snapshot.shapes[wbCanvas.snapshot.shapes.length-1];
+                    if(lastShape) {
+                        if(lastShape.id) {
+                            wbCanvas.snapshot.shapes.push(v.data)
+                        } else {
+                            lastShape.id = v.data.id
+                            drawingState.currentConstruct.id = v.data.id
+                        }
+                    } else {
+                        wbCanvas.snapshot.shapes.push(v.data)
+                    }
+                }
+                break;
+            case MessageType.LinePatch:
+                {
+                    let shape = wbCanvas.snapshot.shapes.find(s => s.id == v.data.shape_id)
+                    if(shape) {
+                        shape.points[1] = v.data.point
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -234,13 +269,17 @@ const update = (time: DOMHighResTimeStamp) => {
     ctx.fillStyle = `#F5F5F5`
     ctx.fillRect(0,0,canvas.width, canvas.height)
 
-    for(let e of wbCanvas.snapshot.shapes) {
-        switch (e.type) {
+    for(let sh of wbCanvas.snapshot.shapes) {
+        switch (sh.type) {
             case ShapeType.Rect:
-                drawRectangle(e)
+                drawRectangle(sh);
                 break;
             case ShapeType.Circle:
-                drawCircle(e)
+                drawCircle(sh)
+                break;
+            case ShapeType.Line:
+                drawLine(sh);
+                break;
             default:
                 break;
         }
@@ -269,12 +308,14 @@ requestAnimationFrame(update)
 window.addEventListener("keydown", (ev) => {
     keys[ev.code] = true
 
-    if(keys["KeyC"]) {
+    if(keys["Digit1"]) {
+        drawingState.currentTool = Tool.Rect
+    }
+    if(keys["Digit2"]) {
         drawingState.currentTool = Tool.Circle
     }
-
-    if(keys["KeyR"]) {
-        drawingState.currentTool = Tool.Rect
+    if(keys["Digit3"]) {
+        drawingState.currentTool = Tool.Line
     }
 })
 
@@ -355,6 +396,28 @@ window.addEventListener("mousemove", (ev) => {
                         )
                     }
                     break;
+                case Tool.Line:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        if(shape) {
+                            shape.points[1] = {
+                                x: (ev.clientX + pageState.cameraTarget.x),
+                                y: (ev.clientY + pageState.cameraTarget.y)
+                            }
+                        }
+                        sendMessage(
+                            MessageType.LinePatch,
+                            {
+                                shape_id: s.id,
+                                point: {
+                                    x: (ev.clientX + pageState.cameraTarget.x),
+                                    y: (ev.clientY + pageState.cameraTarget.y)
+                                }
+                            }
+                        )
+                    }
+                    break;
                 default:
                     break;
             }
@@ -424,6 +487,30 @@ window.addEventListener("mousedown", () => {
                 )
             }
             break;
+        case Tool.Line:
+            {
+                let p1 = {
+                    x: pageState.mouseTarget.x + pageState.cameraTarget.x,
+                    y: pageState.mouseTarget.y + pageState.cameraTarget.y,
+                }
+                let p2 = {...p1}
+                drawingState.currentConstruct = {
+                    type     :ShapeType.Line,
+                    position :{},
+                    size     :{x:0,y:0},
+                    radius   :0,
+                    filled   :false,
+                    points   :[p1, p2],
+                    text     :{},
+                    color    :"#282538",
+                }
+                wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
+                sendMessage(
+                    MessageType.LineCreate,
+                    drawingState.currentConstruct
+                )
+            }
+            break;
         default:
             break;
     }
@@ -453,7 +540,7 @@ window.addEventListener("mouseup", (ev: MouseEvent) => {
                                 }
                             }
                         )
-
+                        drawingState.currentConstruct = {}
                     }
                     break;
                 case Tool.Circle:
@@ -474,7 +561,30 @@ window.addEventListener("mouseup", (ev: MouseEvent) => {
                                 radius: r
                             }
                         )
-
+                        drawingState.currentConstruct = {}
+                    }
+                    break;
+                case Tool.Line:
+                    {
+                        let s = drawingState.currentConstruct as Shape
+                        let shape = wbCanvas.snapshot.shapes.find(sh => sh.id == s.id)
+                        if(shape) {
+                            shape.points[1] = {
+                                x: (ev.clientX + pageState.cameraTarget.x),
+                                y: (ev.clientY + pageState.cameraTarget.y)
+                            }
+                        }
+                        sendMessage(
+                            MessageType.LineUpdate,
+                            {
+                                shape_id: s.id,
+                                point: {
+                                    x: (ev.clientX + pageState.cameraTarget.x),
+                                    y: (ev.clientY + pageState.cameraTarget.y)
+                                }
+                            }
+                        )
+                        drawingState.currentConstruct = {};
                     }
                     break;
                 default:

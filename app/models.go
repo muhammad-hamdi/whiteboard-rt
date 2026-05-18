@@ -60,6 +60,9 @@ const (
 	UpdateRect
 	CreateCircle
 	UpdateCircle
+
+	CreateLine
+	UpdateLine
 )
 
 type Event struct {

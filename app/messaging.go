@@ -72,3 +72,8 @@ type CirclePatchMessage struct {
 	ShapeId string  `json:"shape_id"`
 	Radius  float32 `json:"radius"`
 }
+
+type LinePatchMessage struct {
+	ShapeId string `json:"shape_id"`
+	Point   Vec2   `json:"point"`
+}

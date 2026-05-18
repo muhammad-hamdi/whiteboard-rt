@@ -274,6 +274,105 @@ func (c *Client) readPump() {
 				}
 				message, _ = json.Marshal(msg)
 			}
+		case LineCreate:
+			{
+				var s Shape
+				json.Unmarshal(msg.Data, &s)
+				s.Id = uuid.Must(uuid.NewV4()).String()
+				data, _ := json.Marshal(s)
+
+				var canvas *Canvas
+
+				mu.Lock()
+				for _, cnv := range canvases {
+					if cnv.Id == c.user.CurrentCanvasId {
+						canvas = cnv
+					}
+				}
+				if canvas == nil {
+					// TODO: handle nil canvas
+				}
+				if canvas.Snapshot == nil {
+					canvas.Snapshot = &CanvasData{}
+				}
+				if canvas.Snapshot.Shapes == nil {
+					canvas.Snapshot.Shapes = make([]*Shape, 0)
+				}
+				canvas.Snapshot.Shapes = append(canvas.Snapshot.Shapes, &s)
+				canvas.EventLog = append(canvas.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      CreateLine,
+					Value:     data, // because shape id is assigned here
+				})
+				mu.Unlock()
+
+				msg = Message{
+					Type: LineCreate,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case LinePatch:
+			{
+				var p LinePatchMessage
+				json.Unmarshal(msg.Data, &p)
+
+				mu.Lock()
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								s.Points[1] = p.Point
+								break
+							}
+						}
+						break
+					}
+				}
+				mu.Unlock()
+
+				data, _ := json.Marshal(p)
+				msg = Message{
+					Type: LinePatch,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case LineUpdate:
+			{
+				var p LinePatchMessage
+				json.Unmarshal(msg.Data, &p)
+
+				mu.Lock()
+				var cnv *Canvas
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, s := range canv.Snapshot.Shapes {
+							if s.Id == p.ShapeId {
+								cnv = canv
+								s.Points[1] = p.Point
+								break
+							}
+						}
+						break
+					}
+				}
+				cnv.EventLog = append(cnv.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      UpdateLine,
+					Value:     msg.Data,
+				})
+				mu.Unlock()
+
+				data, _ := json.Marshal(p)
+				msg = Message{
+					Type: LinePatch,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
 		}
 
 		c.room.broadcast <- message
