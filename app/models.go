@@ -63,6 +63,9 @@ const (
 
 	CreateLine
 	UpdateLine
+
+	CreatePath
+	UpdatePath
 )
 
 type Event struct {
