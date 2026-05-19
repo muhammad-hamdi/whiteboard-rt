@@ -8,3 +8,97 @@ body, html {
 canvas {
   display: block; /* Removes bottom margin gap */
 }
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace;
+
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.brand {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+
+  /* backdrop-filter: blur(6px); */
+  /* background: rgba(0, 0, 0, 0.2); */
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+
+  padding: 10px 12px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.subtitle {
+  margin-top: 2px;
+
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.help {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  font-size: 12px;
+
+  backdrop-filter: blur(6px);
+  /* background: rgba(0, 0, 0, 0.2); */
+  color: rgba(0, 0, 0, 0.3);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+
+  padding: 10px 12px;
+}
+
+kbd {
+  display: inline-block;
+
+  padding: 2px 6px;
+
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+
+  background: rgba(255,255,255,0.08);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.alert {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 14px;
+  letter-spacing: -0.03em;
+  color: rgba(0, 0, 0, 0.5);
+}

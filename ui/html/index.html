@@ -3,11 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whiteboard</title>
+    <title>Voidboard</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <canvas id="canvas"></canvas>
+    <div id="overlay">
+        <div class="brand">
+            <div class="title">Voidboard</div>
+            <div class="subtitle">realtime whiteboard experiment</div>
+            <div class="subtitle" id="room">Room Id: </div>
+            <div class="subtitle" id="peers"># of peers: </div>
+        </div>
+
+        <div class="help">
+            <div><kbd>C</kbd> copy room URL</div>
+            <div><kbd>1</kbd> Pen</div>
+            <div><kbd>2</kbd> Rect</div>
+            <div><kbd>3</kbd> Circle</div>
+            <div><kbd>4</kbd> Line</div>
+            <div><kbd>5</kbd> Path, multiple points <kbd>Esc</kbd> to cancel</div>
+            <div><kbd>LeftCtrl</kbd> Hold to move viewport</div>
+            <div>If unresponsive or sync freezes, reload 😭</div>
+        </div>
+
+        <div class="alert" id="alert"></div>
+    </div>
     <script src="/static/js/main.js" type="module"></script>
 </body>
 </html>

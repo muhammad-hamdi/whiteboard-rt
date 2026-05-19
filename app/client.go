@@ -467,7 +467,7 @@ func (c *Client) readPump() {
 
 				data, _ := json.Marshal(p)
 				msg = Message{
-					Type: PathPatch,
+					Type: PathUpdate,
 					Data: data,
 				}
 				message, _ = json.Marshal(msg)

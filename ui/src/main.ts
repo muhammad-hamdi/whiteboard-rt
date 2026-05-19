@@ -10,7 +10,7 @@ enum Tool {
 }
 
 let drawingState = {
-    currentTool: Tool.Rect,
+    currentTool: Tool.Brush,
     mouseDown: false,
     currentConstruct: {} as any
 }
@@ -29,7 +29,7 @@ if (!ctx) {
   throw new Error("Could not get 2d context from canvas");
 }
 
-const wsUri = "ws://localhost:3000/websocket"
+const wsUri = `ws://${location.host}/websocket`
 const websocket = new WebSocket(wsUri)
 
 let keys: Record<string, boolean> = {}
@@ -93,7 +93,7 @@ function drawCircle(s: Shape) {
     ctx.arc(s.position.x - pageState.cameraTarget.x, s.position.y-pageState.cameraTarget.y, s.radius as number, 0, 2*Math.PI, true)
     // ctx.fill()
     ctx.strokeStyle = s.color
-    ctx.lineWidth = 2
+    ctx.lineWidth = 5
     ctx.stroke()
     ctx.lineWidth = 1
 }
@@ -178,6 +178,7 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
             case MessageType.CanvasCreated:
                 wbCanvas = v.data.canvas
                 history.pushState({}, "", wbCanvas.id)
+                document.getElementById("room")!.innerText = `room id: ${wbCanvas.id}`
                 break;
             case MessageType.UserCreated:
                 localStorage.setItem("user", JSON.stringify(v.data.user))
@@ -187,11 +188,13 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                 if(v.data.user_id != localStorage.getItem("user_id")) {
                     if(v.data.disconnected) {
                         cursors.delete(v.data.user_id)
+                        document.getElementById("peers")!.innerText = `# of peers: ${cursors.size}`
                         break
                     }
                     let old = cursors.get(v.data.user_id)
                     if(old == undefined) {
                         old = {p: v.data.cursor_pos, c: "#" + randColor()}
+                        document.getElementById("peers")!.innerText = `# of peers: ${cursors.size+1}`
                     }
                     old.p = v.data.cursor_pos
                     cursors.set(v.data.user_id, old)
@@ -372,7 +375,7 @@ const update = (time: DOMHighResTimeStamp) => {
     }
 
     // DRAW
-    ctx.fillStyle = `#F5F5F5`
+    ctx.fillStyle = `#ffffff`
     ctx.fillRect(0,0,canvas.width, canvas.height)
 
     for(let sh of wbCanvas.snapshot.shapes) {
@@ -422,19 +425,19 @@ window.addEventListener("keydown", (ev) => {
     keys[ev.code] = true
 
     if(keys["Digit1"]) {
-        drawingState.currentTool = Tool.Rect
+        drawingState.currentTool = Tool.Brush
     }
     if(keys["Digit2"]) {
-        drawingState.currentTool = Tool.Circle
+        drawingState.currentTool = Tool.Rect
     }
     if(keys["Digit3"]) {
-        drawingState.currentTool = Tool.Line
+        drawingState.currentTool = Tool.Circle
     }
     if(keys["Digit4"]) {
-        drawingState.currentTool = Tool.Path
+        drawingState.currentTool = Tool.Line
     }
     if(keys["Digit5"]) {
-        drawingState.currentTool = Tool.Brush
+        drawingState.currentTool = Tool.Path
     }
 
     if(keys["Escape"]) {
@@ -457,6 +460,15 @@ window.addEventListener("keydown", (ev) => {
 
     if(keys["KeyD"]) {
         console.log(wbCanvas);
+    }
+
+    if(keys["KeyC"]) {
+        navigator.clipboard.writeText(location.href).then(() => {
+            document.getElementById("alert")!.innerText = "URL Copied!"
+            setTimeout(() => {
+                document.getElementById("alert")!.innerText = ""
+            }, 1000);
+        })
     }
 })
 
@@ -641,7 +653,7 @@ window.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[],
                     text     :{},
-                    color    :"#282538",
+                    color    :"#1e1e1e",
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -663,7 +675,7 @@ window.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[],
                     text     :{},
-                    color    :"#282538",
+                    color    :"#1e1e1e",
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -687,7 +699,7 @@ window.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[p1, p2],
                     text     :{},
-                    color    :"#282538",
+                    color    :"#1e1e1e",
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -731,7 +743,7 @@ window.addEventListener("mousedown", (ev) => {
                         filled   :false,
                         points   :[p1, p2],
                         text     :{},
-                        color    :"#282538",
+                        color    :"#1e1e1e",
                     }
                     wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                     sendMessage(
@@ -750,7 +762,7 @@ window.addEventListener("mousedown", (ev) => {
                 drawingState.currentConstruct = {
                     line_width: 5,
                     points   :[p1],
-                    color    :"#282538",
+                    color    :"#1e1e1e",
                 }
                 wbCanvas.snapshot.brush_strokes.push(drawingState.currentConstruct as BrushStroke)
                 sendMessage(

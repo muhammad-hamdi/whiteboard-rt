@@ -1,4 +1,4 @@
-# Whiteboard RT
+# Voidboard
 Realtime Whiteboard using HTML Canvas, Websockets, Go, Postgres.
 
 ### Run it
