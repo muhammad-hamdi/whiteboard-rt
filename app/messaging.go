@@ -77,3 +77,8 @@ type LinePatchMessage struct {
 	ShapeId string `json:"shape_id"`
 	Point   Vec2   `json:"point"`
 }
+
+type BrushPatchMessage struct {
+	BrushId string `json:"brush_id"`
+	Point   Vec2   `json:"point"`
+}

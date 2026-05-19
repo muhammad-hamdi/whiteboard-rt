@@ -47,10 +47,14 @@ type BrushStroke struct {
 	Color     string  `json:"color"`
 }
 
+// TODO: rethink the need for separate BrushStroke to Shape, the destinction doesn't
+// seem that big right now, it might be worth the memory cost to unite them under shape
+// even if BrushStroke might need per point line width later
+
 type CanvasData struct {
 	Shapes       []*Shape       `json:"shapes"`
 	Text         []*Text        `json:"text"`
-	BrushStrokes []*BrushStroke `json:"brush_stroke"`
+	BrushStrokes []*BrushStroke `json:"brush_strokes"`
 }
 
 type EventType int
@@ -66,6 +70,9 @@ const (
 
 	CreatePath
 	UpdatePath
+
+	CreateBrush
+	UpdateBrush
 )
 
 type Event struct {

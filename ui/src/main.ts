@@ -1,5 +1,5 @@
 import { type Message, MessageType } from "./messaging.js"
-import { type Shape, type Canvas, type Vec2, ShapeType } from "./canvas_model.js"
+import { type Shape, type Canvas, type Vec2, ShapeType, type BrushStroke } from "./canvas_model.js"
 
 enum Tool {
     Rect,
@@ -119,23 +119,47 @@ function drawPath(s: Shape) {
     ctx.beginPath()
 
     ctx.fillStyle = s.color
-    for (let i = 0; i < s.points.length-1; i++) {
-        ctx.moveTo(
+    ctx.moveTo(
+        s.points[0]!.x - pageState.cameraTarget.x,
+        s.points[0]!.y - pageState.cameraTarget.y
+    )
+    for (let i = 1; i < s.points.length; i++) {
+        ctx.lineTo(
             s.points[i]!.x - pageState.cameraTarget.x,
             s.points[i]!.y - pageState.cameraTarget.y
         )
-        ctx.lineTo(
-            s.points[i+1]!.x - pageState.cameraTarget.x,
-            s.points[i+1]!.y - pageState.cameraTarget.y
-        )
     }
 
-    ctx.lineCap = "round"
+    ctx.lineCap = ctx.lineJoin = "round"
     ctx.strokeStyle = s.color
     ctx.lineWidth = 5
     ctx.stroke()
     ctx.lineWidth = 1
     ctx.lineCap = "square"
+    ctx.lineJoin = "miter"
+}
+
+function drawBrush(b: BrushStroke) {
+    ctx.beginPath()
+
+    ctx.lineWidth = b.line_width
+    ctx.lineCap = ctx.lineJoin = "round"
+    ctx.moveTo(
+        b.points[0]!.x - pageState.cameraTarget.x,
+        b.points[0]!.y - pageState.cameraTarget.y
+    )
+
+    for (let i = 0; i < b.points.length; i++) {
+        ctx.lineTo(
+            b.points[i]!.x - pageState.cameraTarget.x,
+            b.points[i]!.y - pageState.cameraTarget.y
+        )
+    }
+
+    ctx.stroke()
+    ctx.lineWidth = 1
+    ctx.lineCap = "square"
+    ctx.lineJoin = "miter"
 }
 
 const sendMessage = (type: MessageType, data: any) => {
@@ -167,7 +191,6 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     }
                     let old = cursors.get(v.data.user_id)
                     if(old == undefined) {
-                        // TODO: make sure color isn't too bright for white text on top
                         old = {p: v.data.cursor_pos, c: "#" + randColor()}
                     }
                     old.p = v.data.cursor_pos
@@ -274,6 +297,29 @@ const handleWebsocketMessages = (ev: MessageEvent) => {
                     }
                 }
                 break;
+            case MessageType.BrushCreate:
+                {
+                    let lastBrush = wbCanvas.snapshot.brush_strokes[wbCanvas.snapshot.brush_strokes.length-1];
+                    if(lastBrush) {
+                        if(lastBrush.id) {
+                            wbCanvas.snapshot.brush_strokes.push(v.data)
+                        } else {
+                            lastBrush.id = v.data.id
+                            drawingState.currentConstruct.id = v.data.id
+                        }
+                    } else {
+                        wbCanvas.snapshot.brush_strokes.push(v.data)
+                    }
+                }
+                break;
+            case MessageType.BrushPatch:
+                {
+                    let brush = wbCanvas.snapshot.brush_strokes.find(s => s.id == v.data.brush_id)
+                    if(brush) {
+                        brush.points.push(v.data.point)
+                    }
+                }
+                break;
             default:
                 break;
         }
@@ -348,6 +394,10 @@ const update = (time: DOMHighResTimeStamp) => {
         }
     }
 
+    for(let b of wbCanvas.snapshot.brush_strokes) {
+        drawBrush(b)
+    }
+
     for(const [k,v] of cursors) {
         ctx.fillStyle = v.c
         ctx.beginPath();
@@ -380,9 +430,11 @@ window.addEventListener("keydown", (ev) => {
     if(keys["Digit3"]) {
         drawingState.currentTool = Tool.Line
     }
-
     if(keys["Digit4"]) {
         drawingState.currentTool = Tool.Path
+    }
+    if(keys["Digit5"]) {
+        drawingState.currentTool = Tool.Brush
     }
 
     if(keys["Escape"]) {
@@ -500,6 +552,28 @@ window.addEventListener("mousemove", (ev) => {
                                 MessageType.LinePatch,
                                 {
                                     shape_id: s.id,
+                                    point: {
+                                        x: (ev.clientX + pageState.cameraTarget.x),
+                                        y: (ev.clientY + pageState.cameraTarget.y)
+                                    }
+                                }
+                            )
+                        }
+                        break;
+                    case Tool.Brush:
+                        {
+                            let s = drawingState.currentConstruct as BrushStroke
+                            let brush = wbCanvas.snapshot.brush_strokes.find(sh => sh.id == s.id)
+                            if(brush) {
+                                brush.points.push({
+                                    x: (ev.clientX + pageState.cameraTarget.x),
+                                    y: (ev.clientY + pageState.cameraTarget.y)
+                                })
+                            }
+                            sendMessage(
+                                MessageType.BrushPatch,
+                                {
+                                    brush_id: s.id,
                                     point: {
                                         x: (ev.clientX + pageState.cameraTarget.x),
                                         y: (ev.clientY + pageState.cameraTarget.y)
@@ -667,6 +741,24 @@ window.addEventListener("mousedown", (ev) => {
                 }
             }
             break;
+        case Tool.Brush:
+            {
+                let p1 = {
+                    x: pageState.mouseTarget.x + pageState.cameraTarget.x,
+                    y: pageState.mouseTarget.y + pageState.cameraTarget.y,
+                }
+                drawingState.currentConstruct = {
+                    line_width: 5,
+                    points   :[p1],
+                    color    :"#282538",
+                }
+                wbCanvas.snapshot.brush_strokes.push(drawingState.currentConstruct as BrushStroke)
+                sendMessage(
+                    MessageType.BrushCreate,
+                    drawingState.currentConstruct
+                )
+            }
+            break;
         default:
             break;
     }
@@ -741,6 +833,29 @@ window.addEventListener("mouseup", (ev: MouseEvent) => {
                             }
                         )
                         drawingState.currentConstruct = {};
+                    }
+                    break;
+                case Tool.Brush:
+                    {
+                        let s = drawingState.currentConstruct as BrushStroke
+                        let brush = wbCanvas.snapshot.brush_strokes.find(sh => sh.id == s.id)
+                        if(brush) {
+                            brush.points.push({
+                                x: (ev.clientX + pageState.cameraTarget.x),
+                                y: (ev.clientY + pageState.cameraTarget.y)
+                            })
+                        }
+                        sendMessage(
+                            MessageType.BrushUpdate,
+                            {
+                                brush_id: s.id,
+                                point: {
+                                    x: (ev.clientX + pageState.cameraTarget.x),
+                                    y: (ev.clientY + pageState.cameraTarget.y)
+                                }
+                            }
+                        )
+                        drawingState.currentConstruct = {}
                     }
                     break;
                 default:

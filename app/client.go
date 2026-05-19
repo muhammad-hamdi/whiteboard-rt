@@ -472,6 +472,105 @@ func (c *Client) readPump() {
 				}
 				message, _ = json.Marshal(msg)
 			}
+		case BrushCreate:
+			{
+				var b BrushStroke
+				json.Unmarshal(msg.Data, &b)
+				b.Id = uuid.Must(uuid.NewV4()).String()
+				data, _ := json.Marshal(b)
+
+				var canvas *Canvas
+
+				mu.Lock()
+				for _, cnv := range canvases {
+					if cnv.Id == c.user.CurrentCanvasId {
+						canvas = cnv
+					}
+				}
+				if canvas == nil {
+					// TODO: handle nil canvas
+				}
+				if canvas.Snapshot == nil {
+					canvas.Snapshot = &CanvasData{}
+				}
+				if canvas.Snapshot.Shapes == nil {
+					canvas.Snapshot.Shapes = make([]*Shape, 0)
+				}
+				canvas.Snapshot.BrushStrokes = append(canvas.Snapshot.BrushStrokes, &b)
+				canvas.EventLog = append(canvas.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      CreateBrush,
+					Value:     data, // because shape id is assigned here
+				})
+				mu.Unlock()
+
+				msg = Message{
+					Type: BrushCreate,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case BrushPatch:
+			{
+				var p BrushPatchMessage
+				json.Unmarshal(msg.Data, &p)
+
+				mu.Lock()
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, b := range canv.Snapshot.BrushStrokes {
+							if b.Id == p.BrushId {
+								b.Points = append(b.Points, p.Point)
+								break
+							}
+						}
+						break
+					}
+				}
+				mu.Unlock()
+
+				data, _ := json.Marshal(p)
+				msg = Message{
+					Type: BrushPatch,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
+		case BrushUpdate:
+			{
+				var p BrushPatchMessage
+				json.Unmarshal(msg.Data, &p)
+
+				mu.Lock()
+				var cnv *Canvas
+				for _, canv := range canvases {
+					if canv.Id == c.user.CurrentCanvasId {
+						for _, b := range canv.Snapshot.BrushStrokes {
+							if b.Id == p.BrushId {
+								cnv = canv
+								b.Points = append(b.Points, p.Point)
+								break
+							}
+						}
+						break
+					}
+				}
+				cnv.EventLog = append(cnv.EventLog, &Event{
+					UserId:    c.user.Id,
+					Timestamp: time.Now().Unix(),
+					Type:      UpdateBrush,
+					Value:     msg.Data,
+				})
+				mu.Unlock()
+
+				data, _ := json.Marshal(p)
+				msg = Message{
+					Type: BrushPatch,
+					Data: data,
+				}
+				message, _ = json.Marshal(msg)
+			}
 		}
 
 		c.room.broadcast <- message
