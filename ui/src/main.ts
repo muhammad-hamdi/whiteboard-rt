@@ -492,18 +492,34 @@ document.addEventListener("visibilitychange", () => {
 })
 //#endregion
 
+function throttle(callback: any, wait: number) {
+  let timeout: any
+  return function(e: any) {
+    if (timeout) return;
+    timeout = setTimeout(() => {
+      callback(e);
+      timeout = undefined;
+    }, wait)
+  }
+}
+
+window.addEventListener("mousemove", throttle(() => {
+    if(websocket.readyState == WebSocket.OPEN) {
+        sendMessage(
+                    MessageType.CursorUpdate,
+                    {
+                        user_id: localStorage.getItem("user_id"),
+                        cursor_pos: pageState.mouseTarget
+                    }
+                )
+    }
+}, 100))
+
 window.addEventListener("mousemove", (ev) => {
     pageState.mouseTarget.x = ev.clientX
     pageState.mouseTarget.y = ev.clientY
 
     if(websocket.readyState == WebSocket.OPEN) {
-        sendMessage(
-            MessageType.CursorUpdate,
-            {
-                user_id: localStorage.getItem("user_id"),
-                cursor_pos: pageState.mouseTarget
-            }
-        )
 
         if(drawingState.currentConstruct.id) {
             if(drawingState.mouseDown) {
