@@ -72,6 +72,7 @@ func (c *Client) readPump() {
 
 		var msg Message
 		json.Unmarshal(message, &msg)
+
 		switch msg.Type {
 		case NewCanvas:
 		case ConnectToCanvas:
@@ -110,10 +111,10 @@ func (c *Client) readPump() {
 				mu.Unlock()
 
 				msg = Message{
-					Type: RectCreate,
-					Data: data,
+					RebroadcastToSender: true,
+					Type:                RectCreate,
+					Data:                data,
 				}
-				message, _ = json.Marshal(msg)
 			}
 		case RectPatch:
 			{
@@ -139,7 +140,7 @@ func (c *Client) readPump() {
 					Type: RectPatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case RectUpdate:
 			{
@@ -173,7 +174,7 @@ func (c *Client) readPump() {
 					Type: RectPatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case CircleCreate:
 			{
@@ -208,10 +209,11 @@ func (c *Client) readPump() {
 
 				data, _ := json.Marshal(s)
 				msg = Message{
-					Type: CircleCreate,
-					Data: data,
+					RebroadcastToSender: true,
+					Type:                CircleCreate,
+					Data:                data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case CirclePatch:
 			{
@@ -237,7 +239,7 @@ func (c *Client) readPump() {
 					Type: CirclePatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case CircleUpdate:
 			{
@@ -272,7 +274,7 @@ func (c *Client) readPump() {
 					Type: CirclePatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case LineCreate:
 			{
@@ -308,10 +310,11 @@ func (c *Client) readPump() {
 				mu.Unlock()
 
 				msg = Message{
-					Type: LineCreate,
-					Data: data,
+					RebroadcastToSender: true,
+					Type:                LineCreate,
+					Data:                data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case LinePatch:
 			{
@@ -337,7 +340,7 @@ func (c *Client) readPump() {
 					Type: LinePatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case LineUpdate:
 			{
@@ -371,7 +374,7 @@ func (c *Client) readPump() {
 					Type: LinePatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case PathCreate:
 			{
@@ -407,10 +410,11 @@ func (c *Client) readPump() {
 				mu.Unlock()
 
 				msg = Message{
-					Type: PathCreate,
-					Data: data,
+					RebroadcastToSender: true,
+					Type:                PathCreate,
+					Data:                data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case PathPatch:
 			{
@@ -436,7 +440,7 @@ func (c *Client) readPump() {
 					Type: PathPatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case PathUpdate:
 			{
@@ -470,7 +474,7 @@ func (c *Client) readPump() {
 					Type: PathUpdate,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case BrushCreate:
 			{
@@ -506,10 +510,11 @@ func (c *Client) readPump() {
 				mu.Unlock()
 
 				msg = Message{
-					Type: BrushCreate,
-					Data: data,
+					RebroadcastToSender: true,
+					Type:                BrushCreate,
+					Data:                data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case BrushPatch:
 			{
@@ -535,7 +540,7 @@ func (c *Client) readPump() {
 					Type: BrushPatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		case BrushUpdate:
 			{
@@ -569,9 +574,12 @@ func (c *Client) readPump() {
 					Type: BrushPatch,
 					Data: data,
 				}
-				message, _ = json.Marshal(msg)
+
 			}
 		}
+
+		msg.SenderId = c.user.Id
+		message, _ = json.Marshal(msg)
 
 		c.room.broadcast <- message
 	}

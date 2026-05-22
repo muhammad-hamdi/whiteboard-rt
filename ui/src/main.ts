@@ -30,7 +30,7 @@ if (!ctx) {
 }
 
 const wsUri = `ws://${location.host}/websocket`
-const websocket = new WebSocket(wsUri)
+let websocket = new WebSocket(wsUri)
 
 let keys: Record<string, boolean> = {}
 
@@ -421,6 +421,29 @@ const update = (time: DOMHighResTimeStamp) => {
 
 requestAnimationFrame(update)
 
+websocket.addEventListener("close", (ev) => reconnectWebsocket)
+
+const reconnectWebsocket = () => {
+    websocket = new WebSocket(wsUri)
+    websocket.addEventListener("open", (ev) => {
+        console.log("Socket Reconnected");
+        sendMessage(
+            MessageType.ConnectToCanvas, {
+                user_id: localStorage.getItem("user_id") ?? "",
+                canvas_id: wbCanvas.id
+            }
+        )
+    })
+    websocket.addEventListener("message", handleWebsocketMessages)
+    websocket.addEventListener("close", (ev) => reconnectWebsocket)
+}
+
+setInterval(() => {
+    if(websocket.readyState != WebSocket.OPEN) {
+        reconnectWebsocket()
+    }
+}, 1000);
+
 window.addEventListener("keydown", (ev) => {
     keys[ev.code] = true
 
@@ -506,16 +529,16 @@ function throttle(callback: any, wait: number) {
 window.addEventListener("mousemove", throttle(() => {
     if(websocket.readyState == WebSocket.OPEN) {
         sendMessage(
-                    MessageType.CursorUpdate,
-                    {
-                        user_id: localStorage.getItem("user_id"),
-                        cursor_pos: pageState.mouseTarget
-                    }
-                )
+            MessageType.CursorUpdate,
+            {
+                user_id: localStorage.getItem("user_id"),
+                cursor_pos: pageState.mouseTarget
+            }
+        )
     }
 }, 100))
 
-window.addEventListener("mousemove", (ev) => {
+window.addEventListener("mousemove", throttle((ev: MouseEvent) => {
     pageState.mouseTarget.x = ev.clientX
     pageState.mouseTarget.y = ev.clientY
 
@@ -636,7 +659,7 @@ window.addEventListener("mousemove", (ev) => {
             }
         }
     }
-})
+}, 20))
 
 window.addEventListener("mousedown", (ev) => {
     pageState.mouseDown = true

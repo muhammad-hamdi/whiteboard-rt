@@ -4,6 +4,10 @@
 
 package main
 
+import (
+	"encoding/json"
+)
+
 // the room models the hub for connected clients
 type Room struct {
 	CanvasId string
@@ -42,12 +46,20 @@ func (r *Room) run() {
 				close(client.send)
 			}
 		case message := <-r.broadcast:
-			for client := range r.clients {
-				select {
-				case client.send <- message:
-				default:
-					close(client.send)
-					delete(r.clients, client)
+			{
+				var msg Message
+				json.Unmarshal(message, &msg)
+
+				for client := range r.clients {
+					if !msg.RebroadcastToSender && client.user.Id == msg.SenderId {
+						continue
+					}
+					select {
+					case client.send <- message:
+					default:
+						close(client.send)
+						delete(r.clients, client)
+					}
 				}
 			}
 		}

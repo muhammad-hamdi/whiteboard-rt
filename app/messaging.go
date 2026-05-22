@@ -34,8 +34,10 @@ const (
 )
 
 type Message struct {
-	Type MessageType     `json:"type"`
-	Data json.RawMessage `json:"data"`
+	RebroadcastToSender bool            `json:"rebroadcast_to_sender"`
+	SenderId            string          `json:"sender_id"`
+	Type                MessageType     `json:"type"`
+	Data                json.RawMessage `json:"data"`
 }
 
 type NewCanvasMessage struct {
