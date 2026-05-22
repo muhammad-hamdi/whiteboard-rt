@@ -29,7 +29,7 @@ if (!ctx) {
   throw new Error("Could not get 2d context from canvas");
 }
 
-const wsUri = `ws://${location.host}/websocket`
+const wsUri = location.protocol === "https:" ? `wss://${location.host}/websocket` : `ws://${location.host}/websocket`
 let websocket = new WebSocket(wsUri)
 
 let keys: Record<string, boolean> = {}
