@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voidboard</title>
+    <link rel="stylesheet" href="https://use.hugeicons.com/font/icons.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/main.js" type="module"></script>
 </head>
 <body>
     <canvas id="canvas"></canvas>
@@ -16,6 +18,30 @@
             <div class="subtitle" id="peers"># of peers: </div>
         </div>
 
+        <div class="toolbar">
+            <button class="tool" id="select" title="Select (In Development LOL)" disabled>
+                <i class="hgi hgi-stroke hgi-rounded hgi-cursor-01"></i>
+            </button>
+            <button class="tool" id="drag" title="Drag">
+                <i class="hgi hgi-stroke hgi-rounded hgi-hand-grab"></i>
+            </button>
+            <button class="tool active" id="brush" title="Pen">
+                <i class="hgi hgi-stroke hgi-rounded hgi-pen-01"></i>
+            </button>
+            <button class="tool" id="rect" title="Rectangle">
+                <i class="hgi hgi-stroke hgi-rounded hgi-square"></i>
+            </button>
+            <button class="tool" id="circle" title="Circle">
+                <i class="hgi hgi-stroke hgi-rounded hgi-circle"></i>
+            </button>
+            <button class="tool" id="line" title="Line">
+                <i class="hgi hgi-stroke hgi-rounded hgi-liner"></i>
+            </button>
+            <button class="tool" id="path" title="Path (Multiple points, press Esc to cancel)">
+                <i class="hgi hgi-stroke hgi-rounded hgi-spline-pointer"></i>
+            </button>
+        </div>
+
         <div class="help">
             <div><kbd>C</kbd> copy room URL</div>
             <div><kbd>1</kbd> Pen</div>
@@ -24,11 +50,9 @@
             <div><kbd>4</kbd> Line</div>
             <div><kbd>5</kbd> Path, multiple points <kbd>Esc</kbd> to cancel</div>
             <div><kbd>LeftCtrl</kbd> Hold to move viewport</div>
-            <div>If unresponsive or sync freezes, reload 😭</div>
         </div>
 
         <div class="alert" id="alert"></div>
     </div>
-    <script src="/static/js/main.js" type="module"></script>
 </body>
 </html>

@@ -6,7 +6,9 @@ enum Tool {
     Circle,
     Line, // two points
     Path, // multiple points, can even add fancy stuff like Bezier-curves
-    Brush
+    Brush,
+    Select,
+    Drag
 }
 
 let drawingState = {
@@ -55,6 +57,54 @@ let wbCanvas: Canvas = {
 }
 
 let cursors: Map<string, {p:Vec2, c:string}> = new Map()
+
+let toolIdMap: Record<Tool, string> = {
+    [Tool.Select]: "select",
+    [Tool.Drag]: "drag",
+    [Tool.Brush]: "brush",
+    [Tool.Rect]: "rect",
+    [Tool.Circle]: "circle",
+    [Tool.Line]: "line",
+    [Tool.Path]: "path"
+}
+
+function setTool(tool: Tool) {
+    drawingState.currentTool = tool
+    document.querySelectorAll(".tool").forEach(el => el.classList.remove("active"))
+    document.getElementById(toolIdMap[tool])!.classList.add("active")
+}
+
+document.querySelectorAll(".tool").forEach(el => {
+    el.addEventListener("click", (ev) => {
+        ev.preventDefault()
+        ev.stopPropagation()
+        switch (el.id) {
+            case "select":
+                setTool(Tool.Select)
+                break;
+            case "drag":
+                setTool(Tool.Drag)
+                break;
+            case "brush":
+                setTool(Tool.Brush)
+                break;
+            case "rect":
+                setTool(Tool.Rect)
+                break;
+            case "circle":
+                setTool(Tool.Circle)
+                break;
+            case "line":
+                setTool(Tool.Line)
+                break;
+            case "path":
+                setTool(Tool.Path)
+                break;
+            default:
+                break;
+        }
+    })
+})
 
 const randColor = () => {
         let r: number, g: number, b: number
@@ -369,7 +419,7 @@ const update = (time: DOMHighResTimeStamp) => {
     pageState.mouseCurrent.x += mouseDelta.x
     pageState.mouseCurrent.y += mouseDelta.y
 
-    if(pageState.mouseDown && keys["ControlLeft"]) {
+    if(pageState.mouseDown && (drawingState.currentTool == Tool.Drag || keys["ControlLeft"])) {
         pageState.cameraTarget.x -= mouseDelta.x
         pageState.cameraTarget.y -= mouseDelta.y
     }
@@ -448,19 +498,19 @@ window.addEventListener("keydown", (ev) => {
     keys[ev.code] = true
 
     if(keys["Digit1"]) {
-        drawingState.currentTool = Tool.Brush
+        setTool(Tool.Brush)
     }
     if(keys["Digit2"]) {
-        drawingState.currentTool = Tool.Rect
+        setTool(Tool.Rect)
     }
     if(keys["Digit3"]) {
-        drawingState.currentTool = Tool.Circle
+        setTool(Tool.Circle)
     }
     if(keys["Digit4"]) {
-        drawingState.currentTool = Tool.Line
+        setTool(Tool.Line)
     }
     if(keys["Digit5"]) {
-        drawingState.currentTool = Tool.Path
+        setTool(Tool.Path)
     }
 
     if(keys["Escape"]) {
@@ -526,7 +576,7 @@ function throttle(callback: any, wait: number) {
   }
 }
 
-window.addEventListener("mousemove", throttle(() => {
+canvas.addEventListener("mousemove", throttle(() => {
     if(websocket.readyState == WebSocket.OPEN) {
         sendMessage(
             MessageType.CursorUpdate,
@@ -538,7 +588,7 @@ window.addEventListener("mousemove", throttle(() => {
     }
 }, 100))
 
-window.addEventListener("mousemove", throttle((ev: MouseEvent) => {
+canvas.addEventListener("mousemove", throttle((ev: MouseEvent) => {
     pageState.mouseTarget.x = ev.clientX
     pageState.mouseTarget.y = ev.clientY
 
@@ -661,7 +711,7 @@ window.addEventListener("mousemove", throttle((ev: MouseEvent) => {
     }
 }, 20))
 
-window.addEventListener("mousedown", (ev) => {
+canvas.addEventListener("mousedown", (ev) => {
     pageState.mouseDown = true
 
     if(
@@ -815,7 +865,7 @@ window.addEventListener("mousedown", (ev) => {
     }
 })
 
-window.addEventListener("mouseup", (ev: MouseEvent) => {
+canvas.addEventListener("mouseup", (ev: MouseEvent) => {
     if(websocket.readyState == WebSocket.OPEN) {
         if(drawingState.currentConstruct.id && drawingState.mouseDown) {
             switch (drawingState.currentTool) {
