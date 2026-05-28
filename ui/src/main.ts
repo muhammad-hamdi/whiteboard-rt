@@ -14,7 +14,8 @@ enum Tool {
 let drawingState = {
     currentTool: Tool.Brush,
     mouseDown: false,
-    currentConstruct: {} as any
+    currentConstruct: {} as any,
+    color: '#1e1e1e'
 }
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement
@@ -189,36 +190,25 @@ function drawPath(s: Shape) {
     ctx.lineJoin = "miter"
 }
 
-function midPointBtw(p1: Vec2, p2: Vec2) {
-  return {
-    x: p1.x + (p2.x - p1.x) / 2,
-    y: p1.y + (p2.y - p1.y) / 2
-  };
-}
+
 
 function drawBrush(b: BrushStroke) {
-    if(b.points.length < 2) {
-        return
-    }
-
+    ctx.beginPath()
     ctx.strokeStyle = b.color
     ctx.lineWidth = b.line_width
     ctx.lineCap = ctx.lineJoin = "round"
 
-    let p1 = {x: b.points[0]!.x - pageState.cameraTarget.x, y: b.points[0]!.y - pageState.cameraTarget.y}
-    let p2 = {x: b.points[1]!.x - pageState.cameraTarget.x, y: b.points[1]!.y - pageState.cameraTarget.y}
+    ctx.moveTo(
+        b.points[0]!.x - pageState.cameraTarget.x,
+        b.points[0]!.y - pageState.cameraTarget.y
+    )
 
-    ctx.beginPath()
-    ctx.moveTo(p1.x, p1.y)
-
-    for (let i = 1; i < b.points.length-1; i++) {
-        let midPoint = midPointBtw(p1, p2)
-        ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y)
-        p1 = {x: b.points[i]!.x - pageState.cameraTarget.x, y: b.points[i]!.y - pageState.cameraTarget.y}
-        p2 = {x: b.points[i+1]!.x - pageState.cameraTarget.x, y: b.points[i+1]!.y - pageState.cameraTarget.y}
+    for (let i = 0; i < b.points.length; i++) {
+        ctx.lineTo(
+            b.points[i]!.x - pageState.cameraTarget.x,
+            b.points[i]!.y - pageState.cameraTarget.y
+        )
     }
-
-    ctx.lineTo(p1.x, p1.y)
 
     ctx.stroke()
     ctx.lineWidth = 1
@@ -723,7 +713,7 @@ canvas.addEventListener("mousemove", throttle((ev: MouseEvent) => {
             }
         }
     }
-}, 20))
+}, 10))
 
 canvas.addEventListener("mousedown", (ev) => {
     pageState.mouseDown = true
