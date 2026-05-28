@@ -18,6 +18,39 @@ let drawingState = {
     color: '#1e1e1e'
 }
 
+const colorBtn = document.getElementById('colorBtn')!;
+const colorPopup = document.getElementById('colorPopup')!;
+const colorPreview = document.getElementById('colorPreview') as HTMLSpanElement;
+// const nativeColorPicker = document.getElementById('nativeColorPicker') as HTMLInputElement;
+
+colorBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    colorPopup.classList.toggle('open');
+});
+
+
+document.querySelectorAll('.color-swatch').forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+        const color = swatch.getAttribute('data-color')!;
+
+        drawingState.color = color;
+        colorPreview.style.background = color;
+
+        colorPopup.classList.remove('open');
+    });
+});
+
+// nativeColorPicker.addEventListener('input', (e) => {
+//     const color = (e.target as HTMLInputElement).value;
+
+//     drawingState.color = color;
+//     colorPreview.style.background = color;
+// });
+
+document.addEventListener('click', () => {
+    colorPopup.classList.remove('open');
+});
+
 const canvas = document.getElementById("canvas") as HTMLCanvasElement
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
@@ -113,7 +146,7 @@ const randColor = () => {
         r = Math.floor(Math.random() * 256)
         g = Math.floor(Math.random() * 256)
         b = Math.floor(Math.random() * 256)
-    } while (r > 200 && g > 200 && b > 200)  
+    } while (r > 200 && g > 200 && b > 200)
     return ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")
 }
 
@@ -746,7 +779,7 @@ canvas.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[],
                     text     :{},
-                    color    :"#1e1e1e",
+                    color    :drawingState.color,
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -768,7 +801,7 @@ canvas.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[],
                     text     :{},
-                    color    :"#1e1e1e",
+                    color    :drawingState.color,
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -792,7 +825,7 @@ canvas.addEventListener("mousedown", (ev) => {
                     filled   :false,
                     points   :[p1, p2],
                     text     :{},
-                    color    :"#1e1e1e",
+                    color    :drawingState.color,
                 }
                 wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                 sendMessage(
@@ -836,7 +869,7 @@ canvas.addEventListener("mousedown", (ev) => {
                         filled   :false,
                         points   :[p1, p2],
                         text     :{},
-                        color    :"#1e1e1e",
+                        color    :drawingState.color,
                     }
                     wbCanvas.snapshot.shapes.push(drawingState.currentConstruct as Shape)
                     sendMessage(
@@ -855,7 +888,7 @@ canvas.addEventListener("mousedown", (ev) => {
                 drawingState.currentConstruct = {
                     line_width: 5,
                     points   :[p1],
-                    color    :"#1e1e1e",
+                    color    :drawingState.color,
                 }
                 wbCanvas.snapshot.brush_strokes.push(drawingState.currentConstruct as BrushStroke)
                 sendMessage(

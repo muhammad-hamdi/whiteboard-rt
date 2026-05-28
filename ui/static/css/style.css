@@ -141,9 +141,72 @@ kbd {
   color: white;
 
   cursor: pointer;
+
+  position: relative;
 }
 
 .tool.active {
   background: rgba(255,255,255,0.2);
   border-color: rgba(255,255,255,0.4);
+}
+
+/* Color Picker */
+
+.color-picker-wrapper {
+  position: relative;
+}
+
+.color-preview {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1e1e1e;
+  border: 2px solid rgba(255,255,255,0.5);
+}
+
+.color-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+
+  display: none;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  width: 200px;
+
+  padding: 10px;
+
+  border-radius: 10px;
+
+  background: rgba(20,20,20,0.95);
+  border: 1px solid rgba(255,255,255,0.08);
+
+  backdrop-filter: blur(8px);
+
+  z-index: 999;
+}
+
+.color-popup.open {
+  display: flex;
+}
+
+.color-swatch {
+  width: 26px;
+  height: 26px;
+
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+
+  cursor: pointer;
+}
+
+.color-swatch:hover {
+  transform: scale(1.08);
+}
+
+#nativeColorPicker {
+  width: 100%;
+  margin-top: 6px;
+  cursor: pointer;
 }

@@ -40,6 +40,25 @@
             <button class="tool" id="path" title="Path (Multiple points, press Esc to cancel)">
                 <i class="hgi hgi-stroke hgi-rounded hgi-spline-pointer"></i>
             </button>
+
+            <div class="color-picker-wrapper">
+                <button class="tool color-tool" id="colorBtn" title="Pick Color">
+                    <span class="color-preview" id="colorPreview"></span>
+                    <i class="hgi hgi-stroke hgi-rounded hgi-colors"></i>
+                </button>
+
+                <div class="color-popup" id="colorPopup">
+                    <button class="color-swatch" data-color="#1e1e1e" style="background:#1e1e1e"></button>
+                    <button class="color-swatch" data-color="#ff4d4d" style="background:#ff4d4d"></button>
+                    <button class="color-swatch" data-color="#4dff88" style="background:#4dff88"></button>
+                    <button class="color-swatch" data-color="#4da6ff" style="background:#4da6ff"></button>
+                    <button class="color-swatch" data-color="#ffd24d" style="background:#ffd24d"></button>
+                    <button class="color-swatch" data-color="#c084fc" style="background:#c084fc"></button>
+
+                    <!-- Native color picker -->
+                    <!--<input type="color" id="nativeColorPicker" value="#1e1e1e">-->
+                </div>
+            </div>
         </div>
 
         <div class="help">
