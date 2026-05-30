@@ -1,6 +1,67 @@
 import { type Message, MessageType } from "./messaging.js"
 import { type Shape, type Canvas, type Vec2, ShapeType, type BrushStroke } from "./canvas_model.js"
 
+enum DrawableType {
+    Rect,
+	Circle,
+	Line,
+    Path,
+    Brush,
+	Text
+}
+
+class Drawable {
+    id       :string;
+	type     :DrawableType;
+	position :Vec2;
+	size     :Vec2;
+	radius   :number;
+	filled   :boolean;
+	points   :Vec2[];
+	text     :string;
+    color    :string;
+}
+
+class Renderer {
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+
+    constructor() {
+        this.canvas = document.getElementById("canvas") as HTMLCanvasElement
+        this.canvas.width = window.innerWidth
+        this.canvas.height = window.innerHeight
+        window.addEventListener("resize", () => {
+            this.canvas.width = window.innerWidth
+            this.canvas.height = window.innerHeight
+        })
+
+        this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D
+
+        if (!this.ctx) {
+          throw new Error("Could not get 2d context from canvas");
+        }
+    }
+
+    drawDocument(drawables: Drawable[]) {
+        for (let drawable of drawables) {
+            switch (drawable.type) {
+                case DrawableType.Rect:
+                    break;
+                case DrawableType.Circle:
+                    break;
+                case DrawableType.Line:
+                    break;
+                case DrawableType.Path:
+                    break;
+                case DrawableType.Brush:
+                    break;
+                case DrawableType.Text:
+                    break;
+            }
+        }
+    }
+}
+
 enum Tool {
     Rect,
     Circle,
@@ -434,7 +495,8 @@ if(location.pathname.slice(1).split("/")[0]?.length == 36) {
     })
 
     websocket.addEventListener("message", handleWebsocketMessages)
-} else {
+}
+else {
     websocket.addEventListener("open", (ev) => {
         console.log("Socket Connected");
         // init message
