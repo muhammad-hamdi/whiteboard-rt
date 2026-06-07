@@ -11,15 +11,16 @@ enum DrawableType {
 }
 
 class Drawable {
-    id       :string;
-	type     :DrawableType;
-	position :Vec2;
-	size     :Vec2;
-	radius   :number;
-	filled   :boolean;
-	points   :Vec2[];
-	text     :string;
-    color    :string;
+    id         :string;
+	type       :DrawableType;
+	position   :Vec2;
+	size       :Vec2;
+	radius     :number;
+    line_width :number;
+	filled     :boolean;
+	points     :Vec2[];
+	text       :string;
+	color      :string;
 }
 
 class Renderer {
